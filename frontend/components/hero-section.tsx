@@ -2,9 +2,10 @@
 
 import { motion } from "framer-motion"
 import { Pacifico } from "next/font/google"
-import { FileText, FileIcon as FilePresentation, ChevronRight } from "lucide-react"
+import { FileIcon as FilePresentation, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import FloatingDocument from "./floating-document"
+import { useEffect, useRef } from "react"
 
 const pacifico = Pacifico({
   subsets: ["latin"],
@@ -29,6 +30,22 @@ export function HeroSection({ onUploadClick }: HeroSectionProps) {
       },
     }),
   }
+
+  // Reference for the GitHub button container
+  const githubButtonRef = useRef<HTMLDivElement>(null);
+  
+  // Handle GitHub buttons script loading
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = "https://buttons.github.io/buttons.js";
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+    
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
 
   return (
     <div className="h-full w-full flex items-center justify-center">
@@ -73,7 +90,7 @@ export function HeroSection({ onUploadClick }: HeroSectionProps) {
             <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center">
               <FilePresentation className="w-4 h-4 text-white" />
             </div>
-            <span className="text-base md:text-lg text-gray-600 tracking-wide font-medium">PDF to PowerPoint</span>
+            <span className="text-base md:text-lg text-gray-600 tracking-wide font-medium">PDF, MD, TXT to PowerPoint</span>
           </motion.div>
 
           <motion.div custom={1} variants={fadeUpVariants} initial="hidden" animate="visible" className="mb-2">
@@ -133,6 +150,20 @@ export function HeroSection({ onUploadClick }: HeroSectionProps) {
             >
               Upload Document <ChevronRight className="w-4 h-4" />
             </button>
+            
+            {/* GitHub star button */}
+            <div className="mt-6" ref={githubButtonRef}>
+              <div className="flex justify-center items-center">
+                  <a 
+                    className="github-button"
+                    href="https://github.com/martin226/slideitin" 
+                    data-size="large" 
+                    aria-label="Star martin226/slideitin on GitHub"
+                  >
+                    Star us on GitHub
+                  </a>
+              </div>
+            </div>
           </motion.div>
         </div>
       </div>
