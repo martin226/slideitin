@@ -1,0 +1,31 @@
+import Link from "next/link"
+
+export default function Footer() {
+  const currentYear = new Date().getFullYear()
+
+  return (
+    <footer className="pb-4 px-4 text-center text-xs sm:text-sm bg-amber-50/80 backdrop-blur-sm text-gray-600 border-t border-amber-100/50 w-full">
+      <p>
+        We're{" "}
+        <Link
+          href="https://github.com/martin226/slideitin"
+          className="underline hover:text-amber-600 font-medium transition-colors"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          open-source
+        </Link>{" "}
+        ❤️! By{" "}
+        <Link
+          href="https://x.com/_martinsit"
+          className="underline hover:text-amber-600 font-medium transition-colors"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          @_martinsit
+        </Link>{" "}
+        &copy; {currentYear}
+      </p>
+    </footer>
+  )
+} 
