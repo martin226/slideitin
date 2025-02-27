@@ -4,8 +4,15 @@ import { Download, Edit, X, RefreshCw } from "lucide-react"
 import { motion } from "framer-motion"
 import { useState } from "react"
 
-const Result = ({ onRestart }: { onRestart?: () => void }) => {
+interface ResultProps {
+  onRestart?: () => void;
+  resultUrl: string;
+}
+
+const Result = ({ onRestart, resultUrl }: ResultProps) => {
   const [tutorialOpen, setTutorialOpen] = useState(false)
+  
+  console.log("Result component rendered with resultUrl:", resultUrl);
 
   // Custom Modal component
   const TutorialModal = () => {
@@ -63,8 +70,15 @@ const Result = ({ onRestart }: { onRestart?: () => void }) => {
         <div className="w-full bg-gray-100 rounded-lg shadow-md">
           {/* Using aspect ratio container for 16:9 */}
           <div className="relative" style={{ paddingBottom: "56.25%" }}>
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
               <p className="text-gray-500 text-lg">Slides Preview Placeholder</p>
+              {/* Display the result URL as text */}
+              <div className="mt-4 p-4 bg-white rounded-md shadow-sm">
+                <p className="text-gray-700 text-sm font-mono break-all">
+                  {/* Temporary placeholder - in a real implementation, this would be replaced with actual slide rendering */}
+                  Download Link: {resultUrl}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -73,6 +87,7 @@ const Result = ({ onRestart }: { onRestart?: () => void }) => {
         <div className="flex flex-col sm:flex-row gap-4 justify-center mt-4">
           <button 
             className="py-3 px-6 rounded-lg bg-amber-500 hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-white font-medium"
+            onClick={() => window.open(resultUrl, '_blank')}
           >
             <Download size={18} />
             Download as PDF

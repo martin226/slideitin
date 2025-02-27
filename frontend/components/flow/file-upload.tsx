@@ -86,7 +86,7 @@ const FileUpload = ({ onNext, onBack, initialFiles }: {
             id="file-upload"
             className="hidden"
             multiple
-            accept=".pdf"
+            accept=".pdf, .md, .txt"
             onChange={handleFileInput}
           />
           <label

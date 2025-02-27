@@ -22,6 +22,8 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
       audience: "professional"
     }
   })
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [resultUrl, setResultUrl] = useState<string | null>(null)
 
   const nextStep = () => {
     setStep((prev) => prev + 1)
@@ -41,6 +43,8 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
         audience: "professional"
       }
     })
+    setJobId(null)
+    setResultUrl(null)
     setStep(1)
   }
 
@@ -65,6 +69,15 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
     prevStep()
   }
 
+  // Handle job completion - called when job status is "completed"
+  const handleJobCompletion = (jobData: { resultUrl: string }) => {
+    console.log("Job completion handler called with:", jobData);
+    console.log("Setting resultUrl to:", jobData.resultUrl);
+    setResultUrl(jobData.resultUrl)
+    console.log("Transitioning to result step");
+    nextStep()
+  }
+
   const steps = [
     { title: "Choose Theme", completed: step > 1 },
     { title: "Upload Files", completed: step > 2 },
@@ -80,10 +93,10 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="pt-16"
+          className="pt-8"
         >
           {/* Step circles and lines */}
-          <div className="flex justify-center items-center space-x-3 md:space-x-6 mb-4">
+          <div className="flex justify-center items-center space-x-3 md:space-x-6">
             {steps.map((s, i) => (
               <div key={i} className="flex flex-col items-center">
                 <motion.div
@@ -148,8 +161,15 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
                 onBack={handleSettingsBack} 
                 initialSettings={data.settings}
               />}
-              {step === 4 && <Success onComplete={nextStep} />}
-              {step === 5 && <Result onRestart={restartFlow} />}
+              {step === 4 && <Success 
+                data={data}
+                onComplete={(jobData: { resultUrl: string }) => handleJobCompletion(jobData)}
+                setJobId={setJobId}
+              />}
+              {step === 5 && <Result 
+                onRestart={restartFlow} 
+                resultUrl={resultUrl!} 
+              />}
             </motion.div>
           </AnimatePresence>
         </div>

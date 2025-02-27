@@ -2,17 +2,125 @@
 
 import { Wand2 } from "lucide-react"
 import { motion } from "framer-motion"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { generateSlides, subscribeToSlideUpdates, SlideRequest, SlideUpdate } from "../../lib/api"
 
-const Success = ({ onComplete }: { onComplete: () => void }) => {
+interface SuccessProps {
+  onComplete: (jobData: { resultUrl: string }) => void;
+  data: {
+    theme: string;
+    files: File[];
+    settings: {
+      slideDetail: string;
+      audience: string;
+    };
+  };
+  setJobId: (id: string) => void;
+}
+
+const Success = ({ onComplete, data, setJobId }: SuccessProps) => {
+  const [status, setStatus] = useState("Initializing...")
+  const [progress, setProgress] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const generationStarted = useRef(false)
+  const jobCompleted = useRef(false)
+
   useEffect(() => {
-    // Move to the results step after 5 seconds
-    const timer = setTimeout(() => {
-      onComplete()
-    }, 5000)
+    let cleanup: (() => void) | null = null;
 
-    return () => clearTimeout(timer)
-  }, [onComplete])
+    const startSlideGeneration = async () => {
+      // Only start the slide generation once
+      if (generationStarted.current) {
+        return;
+      }
+      generationStarted.current = true;
+
+      try {
+        // Prepare data for API call
+        const slideRequest: SlideRequest = {
+          theme: data.theme,
+          settings: data.settings
+        };
+
+        // Call API to generate slides
+        setStatus("Submitting job...")
+        const response = await generateSlides(slideRequest, data.files);
+        
+        // Store job ID
+        setJobId(response.id);
+        setStatus(response.message || "Job submitted successfully");
+        
+        // Subscribe to status updates via SSE
+        cleanup = subscribeToSlideUpdates(
+          response.id,
+          handleStatusUpdate,
+          (error) => {
+            // Only set error if we haven't completed the job yet
+            if (!jobCompleted.current) {
+              console.error("SSE Error:", error);
+              setError(error.message);
+            } else {
+              console.log("Ignoring error after job completion:", error.message);
+            }
+          }
+        );
+        
+      } catch (error) {
+        console.error("Failed to generate slides:", error);
+        setError(error instanceof Error ? error.message : "Unknown error occurred");
+      }
+    };
+
+    startSlideGeneration();
+
+    // Cleanup function to close SSE connection
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [data, setJobId, onComplete]);
+
+  const handleStatusUpdate = (update: SlideUpdate) => {
+    // Update status message
+    setStatus(update.message);
+    console.log("Received status update:", update);
+    
+    // Update progress based on status
+    if (update.status === "queued") {
+      setProgress(10);
+    } else if (update.status === "processing") {
+      // Determine progress based on specific status messages
+      if (update.message.includes("Analyzing")) {
+        setProgress(30);
+      } else if (update.message.includes("Generating content")) {
+        setProgress(50);
+      } else if (update.message.includes("Creating presentation")) {
+        setProgress(70);
+      } else if (update.message.includes("Finalizing")) {
+        setProgress(90);
+      } else {
+        setProgress(50); // Default for processing
+      }
+    } else if (update.status === "completed") {
+      setProgress(100);
+      console.log("Job completed with resultUrl:", update.resultUrl);
+      
+      // Mark job as completed
+      jobCompleted.current = true;
+      
+      // Store reference to prevent cleanup issues
+      const jobResultUrl = update.resultUrl;
+      
+      // Move to next step after a brief delay to show completion
+      setTimeout(() => {
+        console.log("Calling onComplete with:", { resultUrl: jobResultUrl });
+        onComplete({ resultUrl: jobResultUrl });
+      }, 1000);
+    } else if (update.status === "failed") {
+      setError(update.message || "Job failed");
+      // Mark failed jobs as completed too
+      jobCompleted.current = true;
+    }
+  };
 
   return (
     <div className="w-full max-w-4xl mx-auto text-center py-12">
@@ -38,7 +146,11 @@ const Success = ({ onComplete }: { onComplete: () => void }) => {
         transition={{ delay: 0.3 }}
         className="text-xl text-gray-600 mb-8"
       >
-        We're working our magic to transform your documents into beautiful slides.
+        {error ? (
+          <span className="text-red-500">{error}</span>
+        ) : (
+          status
+        )}
       </motion.p>
       <motion.div 
         initial={{ width: 0 }}
@@ -48,13 +160,10 @@ const Success = ({ onComplete }: { onComplete: () => void }) => {
       >
         <motion.div 
           initial={{ width: "0%" }}
-          animate={{ width: "75%" }}
+          animate={{ width: `${progress}%` }}
           transition={{ 
-            delay: 0.5,
-            duration: 1.5, 
-            ease: "easeInOut",
-            repeat: Infinity,
-            repeatType: "reverse" 
+            duration: 0.5, 
+            ease: "easeInOut"
           }}
           className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full"
         ></motion.div>
