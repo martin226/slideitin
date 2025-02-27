@@ -2,8 +2,18 @@
 
 import { Wand2 } from "lucide-react"
 import { motion } from "framer-motion"
+import { useState, useEffect } from "react"
 
-const Success = () => {
+const Success = ({ onComplete }: { onComplete: () => void }) => {
+  useEffect(() => {
+    // Move to the results step after 5 seconds
+    const timer = setTimeout(() => {
+      onComplete()
+    }, 5000)
+
+    return () => clearTimeout(timer)
+  }, [onComplete])
+
   return (
     <div className="w-full max-w-4xl mx-auto text-center py-12">
       <motion.div 

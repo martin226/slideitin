@@ -9,6 +9,7 @@ import ThemeSelection from "./theme-selection"
 import FileUpload from "./file-upload"
 import Settings from "./settings"
 import Success from "./success"
+import Result from "./result"
 
 // Main Upload Flow Component
 export default function UploadFlow({ onBack }: { onBack?: () => void }) {
@@ -28,6 +29,19 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
 
   const prevStep = () => {
     setStep((prev) => prev - 1)
+  }
+
+  const restartFlow = () => {
+    // Reset data and go back to step 1
+    setData({
+      theme: "",
+      files: [],
+      settings: {
+        slideDetail: "medium",
+        audience: "professional"
+      }
+    })
+    setStep(1)
   }
 
   const handleThemeSelect = (theme: string) => {
@@ -55,7 +69,8 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
     { title: "Choose Theme", completed: step > 1 },
     { title: "Upload Files", completed: step > 2 },
     { title: "Settings", completed: step > 3 },
-    { title: "Processing", completed: false }
+    { title: "Processing", completed: step > 4 },
+    { title: "Result", completed: false }
   ]
 
   return (
@@ -77,12 +92,6 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
                     step > i + 1 ? "bg-amber-400 text-white" : 
                     step === i + 1 ? "bg-amber-500 text-white" : "bg-gray-200 text-gray-500"
                   } transition-colors shadow-sm relative cursor-pointer`}
-                  onClick={() => {
-                    // Allow clicking on completed steps to navigate back
-                    if (i + 1 < step) {
-                      setStep(i + 1)
-                    }
-                  }}
                 >
                   {s.completed ? (
                     <CheckCircle className="w-6 h-6" />
@@ -139,7 +148,8 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
                 onBack={handleSettingsBack} 
                 initialSettings={data.settings}
               />}
-              {step === 4 && <Success />}
+              {step === 4 && <Success onComplete={nextStep} />}
+              {step === 5 && <Result onRestart={restartFlow} />}
             </motion.div>
           </AnimatePresence>
         </div>

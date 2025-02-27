@@ -138,8 +138,7 @@ export function HeroSection({ onUploadClick }: HeroSectionProps) {
 
           <motion.div custom={2} variants={fadeUpVariants} initial="hidden" animate="visible">
             <p className="text-sm sm:text-base md:text-lg lg:text-xl text-gray-600 mb-4 sm:mb-6 leading-relaxed font-light tracking-wide max-w-2xl mx-auto px-2 sm:px-4">
-              Upload your documents and instantly get beautiful, presentation-ready PowerPoint slides with just one
-              click.
+              Upload your documents and instantly get beautiful, presentation-ready PowerPoint slides in &lt; 3 minutes.
             </p>
           </motion.div>
 
@@ -148,7 +147,7 @@ export function HeroSection({ onUploadClick }: HeroSectionProps) {
               onClick={onUploadClick}
               className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-full text-base md:text-lg font-medium flex items-center gap-2 mx-auto transition-colors"
             >
-              Upload Document <ChevronRight className="w-4 h-4" />
+              Upload Documents <ChevronRight className="w-4 h-4" />
             </button>
             
             {/* GitHub star button */}

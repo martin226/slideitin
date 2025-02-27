@@ -26,8 +26,9 @@ const FileUpload = ({ onNext, onBack, initialFiles }: {
     e.preventDefault()
     setIsDragging(false)
     
+    // allow PDF, MD, TXT
     const droppedFiles = Array.from(e.dataTransfer.files).filter(
-      (file) => file.type === "application/pdf"
+      (file) => file.type === "application/pdf" || file.type === "text/markdown" || file.type === "text/plain"
     )
     
     if (droppedFiles.length > 0) {
@@ -38,7 +39,7 @@ const FileUpload = ({ onNext, onBack, initialFiles }: {
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) {
       const selectedFiles = Array.from(e.target.files).filter(
-        (file) => file.type === "application/pdf"
+        (file) => file.type === "application/pdf" || file.type === "text/markdown" || file.type === "text/plain"
       )
       setFiles((prev) => [...prev, ...selectedFiles])
     }
@@ -50,7 +51,7 @@ const FileUpload = ({ onNext, onBack, initialFiles }: {
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Upload PDF Documents</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">Upload Documents</h2>
       
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -77,7 +78,7 @@ const FileUpload = ({ onNext, onBack, initialFiles }: {
         >
           <Upload className="mx-auto h-16 w-16 text-amber-500 mb-4" />
           <p className="text-xl text-gray-700 mb-2 font-medium">
-            Drag and drop PDF files here
+            Drag and drop your files here
           </p>
           <p className="text-md text-gray-500 mb-6">or click to browse your files</p>
           <input
@@ -94,7 +95,7 @@ const FileUpload = ({ onNext, onBack, initialFiles }: {
           >
             <span>Browse Files</span>
           </label>
-          <p className="text-sm text-gray-500 mt-6">Supports PDF files only</p>
+          <p className="text-sm text-gray-500 mt-6">Supports PDF, MD, and TXT files</p>
         </motion.div>
       </motion.div>
 

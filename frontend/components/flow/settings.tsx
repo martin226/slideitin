@@ -110,10 +110,10 @@ const Settings = ({ onNext, onBack, initialSettings }: SettingsProps) => {
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.98 }}
           onClick={handleSubmit}
-          className="font-bold px-8 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-md flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
+          className="font-bold px-8 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
         >
-          Slide it In
           <Wand2 className="h-5 w-5" />
+          Slide it In
         </motion.button>
       </div>
     </div>
