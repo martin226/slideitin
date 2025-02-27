@@ -1,12 +1,15 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -73,43 +76,88 @@ func (c *SlideController) GenerateSlides(ctx *gin.Context) {
 		return
 	}
 
-	// Process files
-	fileContents := make([][]byte, 0, len(files))
-	fileNames := make([]string, 0, len(files))
-
+	// Read file data into memory to prevent it from being released
+	fileData := make([]struct {
+		Filename string
+		Data     []byte
+		Type     string
+	}, 0, len(files))
+	
 	for _, file := range files {
-		// Open file
-		f, err := file.Open()
+		// Open the file
+		src, err := file.Open()
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"error": fmt.Sprintf("Failed to open file: %v", err),
+				"error": fmt.Sprintf("Failed to open file %s: %v", file.Filename, err),
 			})
 			return
 		}
-		defer f.Close()
-
-		// Read file content
-		content := make([]byte, file.Size)
-		if _, err := f.Read(content); err != nil {
+		
+		// Read the file data
+		data, err := io.ReadAll(src)
+		src.Close() // Close the file after reading
+		
+		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"error": fmt.Sprintf("Failed to read file: %v", err),
+				"error": fmt.Sprintf("Failed to read file %s: %v", file.Filename, err),
 			})
 			return
 		}
+		
+		// Detect MIME type from file content instead of using header
+		// DetectContentType only needs the first 512 bytes
+		mimeType := http.DetectContentType(data)
+		
+		// Validate file type - only allow PDF, Markdown and TXT
+		isAllowed := false
 
-		fileContents = append(fileContents, content)
-		fileNames = append(fileNames, file.Filename)
+		// Check by file extension first
+		fileExt := strings.ToLower(filepath.Ext(file.Filename))
+		if fileExt == ".pdf" || fileExt == ".md" || fileExt == ".txt" {
+			// Now check MIME type
+			if mimeType == "application/pdf" {
+				// PDF is valid
+				isAllowed = true
+			} else if mimeType == "text/plain" {
+				// Plain text (could be TXT or MD)
+				isAllowed = true
+			} else if strings.Contains(mimeType, "markdown") || strings.Contains(mimeType, "text/") {
+				// Some systems detect markdown as text/markdown, text/x-markdown, or just text/plain
+				// For text files, we'll trust the extension more than the mime type
+				if fileExt == ".md" || fileExt == ".txt" {
+					isAllowed = true
+				}
+			}
+		}
+
+		if !isAllowed {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("Unsupported file type: %s. Only PDF, Markdown, and TXT files are allowed", file.Filename),
+			})
+			return
+		}
+		
+		// Store the file data
+		fileData = append(fileData, struct {
+			Filename string
+			Data     []byte
+			Type     string
+		}{
+			Filename: file.Filename,
+			Data:     data,
+			Type:     mimeType,
+		})
 	}
 
 	// Log the request
-	log.Printf("Received slide generation request: Theme: %s, Files: %v, Settings: %+v", 
-		req.Theme, fileNames, req.Settings)
+	log.Printf("Received slide generation request: Theme: %s, Files count: %d, Settings: %+v", 
+		req.Theme, len(fileData), req.Settings)
 
 	// Generate a unique job ID
 	jobID := uuid.New().String()
 
 	// Add job to queue instead of processing immediately
-	job, err := c.queueService.AddJob(ctx, jobID, req.Theme, fileContents, fileNames, req.Settings)
+	job, err := c.queueService.AddJob(ctx, jobID, req.Theme, fileData, req.Settings)
 	if err != nil {
 		ctx.JSON(http.StatusServiceUnavailable, gin.H{
 			"error": err.Error(),
@@ -171,31 +219,25 @@ func (c *SlideController) StreamSlideStatus(ctx *gin.Context) {
 	ctx.Writer.Header().Set("X-Accel-Buffering", "no") // Disable buffering in Nginx if used
 	ctx.Writer.Flush()
 
-	// Create channel for job updates
+	// Create channel for job updates and set up a cancellation context
 	updates := make(chan queue.JobUpdate, 10)
-	defer close(updates)
+	streamCtx, cancelStream := context.WithCancel(ctx.Request.Context())
+	defer cancelStream()
 
-	// Subscribe to job updates
-	exists, err := c.queueService.Subscribe(id, updates)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error": fmt.Sprintf("Failed to subscribe to job updates: %v", err),
-		})
-		return
-	}
+	// Watch for job updates from Firestore
+	go func() {
+		defer close(updates)
+		err := c.queueService.WatchJob(streamCtx, id, updates)
+		if err != nil && err != context.Canceled {
+			log.Printf("Error watching job %s: %v", id, err)
+		}
+	}()
 
-	if !exists {
-		ctx.JSON(http.StatusNotFound, gin.H{
-			"error": "Job not found",
-		})
-		return
-	}
-
-	// Ensure client is notified when connection is closed
+	// Stream events to client
 	ctx.Stream(func(w io.Writer) bool {
 		// Check if client closed connection
 		if ctx.Request.Context().Err() != nil {
-			c.queueService.Unsubscribe(id, updates)
+			cancelStream()
 			return false
 		}
 
@@ -221,7 +263,7 @@ func (c *SlideController) StreamSlideStatus(ctx *gin.Context) {
 				// Wait a moment before closing to ensure the message is sent
 				time.Sleep(100 * time.Millisecond)
 				
-				c.queueService.Unsubscribe(id, updates)
+				cancelStream()
 				return false
 			}
 			
@@ -233,4 +275,28 @@ func (c *SlideController) StreamSlideStatus(ctx *gin.Context) {
 			return true
 		}
 	})
+}
+
+// GetSlideResult handles retrieving and serving the presentation result
+func (c *SlideController) GetSlideResult(ctx *gin.Context) {
+	id := ctx.Param("id")
+	if id == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "Missing result ID",
+		})
+		return
+	}
+
+	// Retrieve the result from Firestore
+	result, err := c.queueService.GetResult(ctx, id)
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{
+			"error": fmt.Sprintf("Result not found: %v", err),
+		})
+		return
+	}
+
+	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=presentation-%s.pdf", id))
+	ctx.Data(http.StatusOK, "application/pdf", result.PDFData)
+	return
 } 

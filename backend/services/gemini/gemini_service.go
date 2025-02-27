@@ -2,10 +2,13 @@ package gemini
 
 import (
 	"context"
+	"io"
 	"log"
 	"time"
+	
 	"github.com/slideitin/backend/models"
 	"github.com/slideitin/backend/services/prompts"
+	"bytes"
 )
 
 // Service handles interactions with the Gemini API
@@ -24,39 +27,48 @@ func NewService(apiKey string) *Service {
 func (s *Service) GenerateSlides(
 	ctx context.Context, 
 	theme string, 
-	fileContents [][]byte, 
-	fileNames []string, 
+	files []struct {
+		Filename string
+		Data     []byte
+		Type     string
+	},
 	settings models.SlideSettings,
-	statusUpdateFn func(status string, message string) error,
-) (string, error) {
+	statusUpdateFn func(message string) error,
+) (string, []byte, error) {
 	// Update status to show we're processing the files
-	if err := statusUpdateFn("processing", "Analyzing uploaded files"); err != nil {
-		return "", err
-	}
-	time.Sleep(5 * time.Second)
-
-	// 1. Convert binary file contents to strings for prompt generation
-	fileStrings := make([]string, len(fileContents))
-	for i, content := range fileContents {
-		fileStrings[i] = string(content)
+	if err := statusUpdateFn("Analyzing uploaded files"); err != nil {
+		return "", nil, err
 	}
 	
+	// Process files by creating readers from the stored data when needed
+	// This ensures the file data is available even after the HTTP request finishes
+	for _, file := range files {
+		fileReader := io.NopCloser(bytes.NewReader(file.Data))
+		
+		// dummy use to prevent compiler error
+		fileReader.Read(nil)
+		
+		log.Printf("Processing file: %s (%s)", file.Filename, file.Type)
+	}
+	
+	time.Sleep(5 * time.Second)
+
 	// Update status to show we're generating the prompt
-	if err := statusUpdateFn("processing", "Generating content for slides"); err != nil {
-		return "", err
+	if err := statusUpdateFn("Generating content for slides"); err != nil {
+		return "", nil, err
 	}
 	time.Sleep(5 * time.Second)
 	
 	// 2. Generate the prompt using the prompt generator
-	prompt, err := prompts.GenerateSlidePrompt(theme, fileStrings, fileNames, settings)
+	prompt, err := prompts.GenerateSlidePrompt(theme, settings)
 	if err != nil {
 		log.Printf("Error generating prompt: %v", err)
-		return "", err
+		return "", nil, err
 	}
 	
 	// Update status to show we're sending to Gemini
-	if err := statusUpdateFn("processing", "Creating presentation with AI"); err != nil {
-		return "", err
+	if err := statusUpdateFn("Creating presentation with AI"); err != nil {
+		return "", nil, err
 	}
 	time.Sleep(5 * time.Second)
 
@@ -65,10 +77,10 @@ func (s *Service) GenerateSlides(
 	log.Printf("Would send to Gemini with settings: %+v", settings)
 	
 	// Update status to show we're finalizing the presentation
-	if err := statusUpdateFn("processing", "Finalizing presentation"); err != nil {
-		return "", err
+	if err := statusUpdateFn("Finalizing presentation"); err != nil {
+		return "", nil, err
 	}
 	time.Sleep(5 * time.Second)
 	// For now, just return a placeholder
-	return "placeholder-presentation-id", nil
+	return "placeholder-presentation-id", nil, nil
 }

@@ -7,7 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/slideitin/backend/models"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // JobStatus represents the current status of a job
@@ -20,23 +23,44 @@ const (
 	StatusFailed     JobStatus = "failed"
 )
 
-// Job represents a single slide generation job
-type Job struct {
-	ID          string
-	Theme       string
-	Files       [][]byte
-	FileNames   []string
-	Settings    models.SlideSettings
-	Status      JobStatus
-	Message     string
-	ResultURL   string
-	CreatedAt   int64
-	UpdatedAt   int64
-	Subscribers map[chan JobUpdate]bool
-	mu          sync.RWMutex
+// FirestoreJob is the Firestore representation of a job
+// Simplified to contain only essential fields
+type FirestoreJob struct {
+	ID        string `firestore:"id"`
+	Status    string `firestore:"status"`
+	Message   string `firestore:"message"`
+	CreatedAt int64  `firestore:"createdAt"`
+	UpdatedAt int64  `firestore:"updatedAt"`
+	ExpiresAt int64  `firestore:"expiresAt,omitempty"`
 }
 
-// JobUpdate represents an update to a job that can be sent to subscribers
+// FirestoreResult is the Firestore representation of a job result
+type FirestoreResult struct {
+	ID          string `firestore:"id"`
+	ResultURL   string `firestore:"resultUrl"`
+	PDFData     []byte `firestore:"pdfData"`
+	CreatedAt   int64  `firestore:"createdAt"`
+	ExpiresAt   int64  `firestore:"expiresAt"`
+}
+
+// Job represents a single slide generation job with runtime features
+type Job struct {
+	ID        string
+	Theme     string
+	Files     []struct {
+		Filename string
+		Data     []byte
+		Type     string
+	}
+	Settings  models.SlideSettings
+	Status    JobStatus
+	Message   string
+	ResultURL string
+	CreatedAt int64
+	UpdatedAt int64
+}
+
+// JobUpdate represents an update to a job that can be sent to SSE clients
 type JobUpdate struct {
 	ID        string    `json:"id"`
 	Status    JobStatus `json:"status"`
@@ -45,91 +69,155 @@ type JobUpdate struct {
 	UpdatedAt int64     `json:"updatedAt"`
 }
 
-// Service manages a queue of slide generation jobs
+// Service manages jobs using Firestore
 type Service struct {
-	jobs      map[string]*Job // TODO: Replace with Redis or something more scalable
-	queue     chan *Job
+	client    *firestore.Client
 	mu        sync.RWMutex
 	geminiSvc interface {
-		GenerateSlides(ctx context.Context, theme string, fileContents [][]byte, fileNames []string, settings models.SlideSettings, statusUpdateFn func(statusStr string, message string) error) (string, error)
+		GenerateSlides(ctx context.Context, theme string, files []struct {
+			Filename string
+			Data     []byte
+			Type     string
+		}, settings models.SlideSettings, statusUpdateFn func(message string) error) (string, []byte, error)
 	}
 }
 
-// NewService creates a new queue service
-func NewService(geminiSvc interface {
-	GenerateSlides(ctx context.Context, theme string, fileContents [][]byte, fileNames []string, settings models.SlideSettings, statusUpdateFn func(statusStr string, message string) error) (string, error)
+// NewService creates a new queue service using Firestore
+func NewService(client *firestore.Client, geminiSvc interface {
+	GenerateSlides(ctx context.Context, theme string, files []struct {
+		Filename string
+		Data     []byte
+		Type     string
+	}, settings models.SlideSettings, statusUpdateFn func(message string) error) (string, []byte, error)
 }) *Service {
 	s := &Service{
-		jobs:      make(map[string]*Job),
-		queue:     make(chan *Job, 100), // Buffer for up to 100 jobs
+		client:    client,
 		geminiSvc: geminiSvc,
-	}
-
-	// Start background workers
-	for i := 0; i < 3; i++ { // Number of concurrent workers
-		go s.worker()
 	}
 
 	return s
 }
 
-// AddJob adds a new job to the queue
-func (s *Service) AddJob(ctx context.Context, id, theme string, files [][]byte, fileNames []string, settings models.SlideSettings) (*Job, error) {
-	// Check if queue is full before creating the job
-	if len(s.queue) >= cap(s.queue) {
-		log.Printf("Queue is full, rejected job %s", id)
-		return nil, fmt.Errorf("system is busy, please try again later")
-	}
+// Collection returns the Firestore collection reference for jobs
+func (s *Service) Collection() *firestore.CollectionRef {
+	return s.client.Collection("jobs")
+}
 
+// ResultsCollection returns the Firestore collection reference for results
+func (s *Service) ResultsCollection() *firestore.CollectionRef {
+	return s.client.Collection("results")
+}
+
+// AddJob adds a new job to Firestore and processes it immediately
+func (s *Service) AddJob(ctx context.Context, id, theme string, fileData []struct {
+	Filename string
+	Data     []byte
+	Type     string
+}, settings models.SlideSettings) (*Job, error) {
 	// Create the job
 	now := time.Now().Unix()
-	job := &Job{
-		ID:          id,
-		Theme:       theme,
-		Files:       files,
-		FileNames:   fileNames,
-		Settings:    settings,
-		Status:      StatusQueued,
-		Message:     "Job added to queue",
-		CreatedAt:   now,
-		UpdatedAt:   now,
-		Subscribers: make(map[chan JobUpdate]bool),
+	
+	// Create a job record for Firestore (simplified)
+	firestoreJob := FirestoreJob{
+		ID:        id,
+		Status:    string(StatusQueued),
+		Message:   "Job added to queue",
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 
-	// Add job to map and queue
-	s.mu.Lock()
-	s.jobs[id] = job
-	s.mu.Unlock()
+	// Save to Firestore
+	_, err := s.Collection().Doc(id).Set(ctx, firestoreJob)
+	if err != nil {
+		log.Printf("Failed to add job to Firestore: %v", err)
+		return nil, fmt.Errorf("failed to store job: %v", err)
+	}
 
-	// Add job to processing queue
-	s.queue <- job
+	log.Printf("Added job %s to Firestore", id)
 
-	log.Printf("Added job %s to queue", id)
+	// Create in-memory job object for processing
+	job := &Job{
+		ID:        id,
+		Theme:     theme,
+		Files:     fileData,
+		Settings:  settings,
+		Status:    StatusQueued,
+		Message:   "Job added to queue",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	// Start processing in a goroutine
+	go s.processJob(job)
+
 	return job, nil
 }
 
-// GetJob retrieves a job by its ID
+// GetJob retrieves a job by its ID from Firestore
 func (s *Service) GetJob(id string) *Job {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.jobs[id]
-}
-
-// Subscribe adds a subscriber to receive job updates
-func (s *Service) Subscribe(jobID string, updates chan JobUpdate) (bool, error) {
-	s.mu.RLock()
-	job, exists := s.jobs[jobID]
-	s.mu.RUnlock()
-
-	if !exists {
-		return false, nil
+	ctx := context.Background()
+	doc, err := s.Collection().Doc(id).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			log.Printf("Job %s not found in Firestore", id)
+			return nil
+		}
+		log.Printf("Error retrieving job %s: %v", id, err)
+		return nil
 	}
 
-	job.mu.Lock()
-	job.Subscribers[updates] = true
-	job.mu.Unlock()
+	var firestoreJob FirestoreJob
+	if err := doc.DataTo(&firestoreJob); err != nil {
+		log.Printf("Error parsing job data: %v", err)
+		return nil
+	}
 
-	// Send initial update
+	// Check if job has expired
+	now := time.Now().Unix()
+	if firestoreJob.ExpiresAt > 0 && now > firestoreJob.ExpiresAt {
+		// Job has expired, delete it
+		_, err := s.Collection().Doc(id).Delete(ctx)
+		if err != nil {
+			log.Printf("Failed to delete expired job %s: %v", id, err)
+		} else {
+			log.Printf("Deleted expired job %s", id)
+		}
+		return nil
+	}
+
+	// Get the result if available
+	var resultURL string
+	if firestoreJob.Status == string(StatusCompleted) {
+		resultDoc, err := s.ResultsCollection().Doc(id).Get(ctx)
+		if err == nil && resultDoc.Exists() {
+			var result FirestoreResult
+			if err := resultDoc.DataTo(&result); err == nil {
+				resultURL = result.ResultURL
+			}
+		}
+	}
+
+	// Convert to job object
+	return &Job{
+		ID:        firestoreJob.ID,
+		Status:    JobStatus(firestoreJob.Status),
+		Message:   firestoreJob.Message,
+		ResultURL: resultURL,
+		CreatedAt: firestoreJob.CreatedAt,
+		UpdatedAt: firestoreJob.UpdatedAt,
+	}
+}
+
+// WatchJob watches a job for changes and sends updates to the provided channel
+// This function will run until the context is canceled or the job reaches a terminal state
+func (s *Service) WatchJob(ctx context.Context, jobID string, updates chan<- JobUpdate) error {
+	// Get initial job state
+	job := s.GetJob(jobID)
+	if job == nil {
+		return fmt.Errorf("job not found")
+	}
+
+	// Send initial status
 	updates <- JobUpdate{
 		ID:        job.ID,
 		Status:    job.Status,
@@ -138,62 +226,88 @@ func (s *Service) Subscribe(jobID string, updates chan JobUpdate) (bool, error) 
 		UpdatedAt: job.UpdatedAt,
 	}
 
-	return true, nil
-}
-
-// Unsubscribe removes a subscriber from job updates
-func (s *Service) Unsubscribe(jobID string, updates chan JobUpdate) {
-	s.mu.RLock()
-	job, exists := s.jobs[jobID]
-	s.mu.RUnlock()
-
-	if !exists {
-		return
+	// If job is already in terminal state, we're done
+	if job.Status == StatusCompleted || job.Status == StatusFailed {
+		close(updates)
+		return nil
 	}
 
-	job.mu.Lock()
-	delete(job.Subscribers, updates)
-	job.mu.Unlock()
-}
+	// Set up Firestore snapshot listener for real-time updates
+	docRef := s.Collection().Doc(jobID)
+	snapshots := docRef.Snapshots(ctx)
 
-// worker processes jobs from the queue
-func (s *Service) worker() {
-	for job := range s.queue {
-		s.processJob(job)
+	// Watch for updates
+	for {
+		snapshot, err := snapshots.Next()
+		if err != nil {
+			log.Printf("Error watching job %s: %v", jobID, err)
+			return err
+		}
+
+		if !snapshot.Exists() {
+			log.Printf("Job %s no longer exists", jobID)
+			return fmt.Errorf("job deleted")
+		}
+
+		var firestoreJob FirestoreJob
+		if err := snapshot.DataTo(&firestoreJob); err != nil {
+			log.Printf("Error parsing job data: %v", err)
+			continue
+		}
+
+		// Get result URL if job is completed
+		var resultURL string
+		if firestoreJob.Status == string(StatusCompleted) {
+			resultDoc, err := s.ResultsCollection().Doc(jobID).Get(ctx)
+			if err == nil && resultDoc.Exists() {
+				var result FirestoreResult
+				if err := resultDoc.DataTo(&result); err == nil {
+					resultURL = result.ResultURL
+				}
+			}
+		}
+
+		// Send update
+		update := JobUpdate{
+			ID:        firestoreJob.ID,
+			Status:    JobStatus(firestoreJob.Status),
+			Message:   firestoreJob.Message,
+			ResultURL: resultURL,
+			UpdatedAt: firestoreJob.UpdatedAt,
+		}
+
+		select {
+		case updates <- update:
+			// Successfully sent
+		case <-ctx.Done():
+			// Context was canceled
+			return ctx.Err()
+		}
+
+		// If job is in terminal state, we're done
+		if update.Status == StatusCompleted || update.Status == StatusFailed {
+			return nil
+		}
 	}
 }
 
 // processJob processes a slide generation job
 func (s *Service) processJob(job *Job) {
-	// Update job status to processing
+	// Update job status to processing in Firestore
 	s.updateJobStatus(job, StatusProcessing, "Processing slides", "")
 
 	// Create a status update function to pass to the Gemini service
-	statusUpdateFn := func(statusStr string, message string) error {
-		// Convert string status to JobStatus
-		var status JobStatus
-		switch statusStr {
-		case "processing":
-			status = StatusProcessing
-		case "completed":
-			status = StatusCompleted
-		case "failed":
-			status = StatusFailed
-		default:
-			status = StatusProcessing
-		}
-		
-		s.updateJobStatus(job, status, message, "")
+	statusUpdateFn := func(message string) error {
+		s.updateJobStatus(job, StatusProcessing, message, "")
 		return nil
 	}
 
 	// Call the Gemini service with the status update function
 	ctx := context.Background()
-	resultID, err := s.geminiSvc.GenerateSlides(
+	resultID, pdfData, err := s.geminiSvc.GenerateSlides(
 		ctx, 
 		job.Theme, 
 		job.Files, 
-		job.FileNames, 
 		job.Settings,
 		statusUpdateFn,
 	)
@@ -203,52 +317,124 @@ func (s *Service) processJob(job *Job) {
 		return
 	}
 
-	// Update job as completed
-	resultURL := "/api/v1/results/" + resultID // This would be the actual URL to download results
-	s.updateJobStatus(job, StatusCompleted, "Slides generated successfully", resultURL)
+	// Create result URL
+	resultURL := "/api/v1/results/" + resultID
+
+	// Store result in Firestore
+	s.storeResult(ctx, job.ID, resultURL, pdfData)
+
+	// Update job as completed and set to expire in 5 minutes
+	s.setJobCompleted(job, "Slides generated successfully", resultURL)
 }
 
-func (s *Service) removeJob(job *Job) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.jobs, job.ID)
-	log.Printf("Job %s removed from queue", job.ID)
+// setJobCompleted marks a job as completed and sets it to expire in 5 minutes
+func (s *Service) setJobCompleted(job *Job, message, resultURL string) {
+	ctx := context.Background()
+	now := time.Now().Unix()
+	// Set job to expire in 5 minutes
+	expiresAt := now + 300 // 300 seconds = 5 minutes
+	
+	// Update job in Firestore
+	updates := []firestore.Update{
+		{Path: "status", Value: string(StatusCompleted)},
+		{Path: "message", Value: message},
+		{Path: "updatedAt", Value: now},
+		{Path: "expiresAt", Value: expiresAt},
+	}
+
+	_, err := s.Collection().Doc(job.ID).Update(ctx, updates)
+	if err != nil {
+		log.Printf("Failed to update job status in Firestore: %v", err)
+	}
+
+	// Update the in-memory job
+	job.Status = StatusCompleted
+	job.Message = message
+	job.UpdatedAt = now
+	job.ResultURL = resultURL
+
+	log.Printf("Job %s completed and will expire at %s", job.ID, time.Unix(expiresAt, 0).Format(time.RFC3339))
 }
 
-// updateJobStatus updates a job's status and notifies subscribers
+// storeResult stores a job result in Firestore
+func (s *Service) storeResult(ctx context.Context, jobID, resultURL string, pdfData []byte) error {
+	now := time.Now().Unix()
+	// Set expiration time to 1 hour from now
+	expiresAt := now + 3600
+	
+	result := FirestoreResult{
+		ID:          jobID,
+		ResultURL:   resultURL,
+		PDFData:     pdfData,
+		CreatedAt:   now,
+		ExpiresAt:   expiresAt,
+	}
+	
+	_, err := s.ResultsCollection().Doc(jobID).Set(ctx, result)
+	if err != nil {
+		log.Printf("Failed to store result for job %s: %v", jobID, err)
+		return fmt.Errorf("failed to store result: %v", err)
+	}
+	
+	log.Printf("Stored result for job %s (expires at %s)", jobID, time.Unix(expiresAt, 0).Format(time.RFC3339))
+	return nil
+}
+
+// updateJobStatus updates a job's status in Firestore
 func (s *Service) updateJobStatus(job *Job, status JobStatus, message, resultURL string) {
-	job.mu.Lock()
+	ctx := context.Background()
+	now := time.Now().Unix()
+
+	// Update job in Firestore
+	updates := []firestore.Update{
+		{Path: "status", Value: string(status)},
+		{Path: "message", Value: message},
+		{Path: "updatedAt", Value: now},
+	}
+
+	_, err := s.Collection().Doc(job.ID).Update(ctx, updates)
+	if err != nil {
+		log.Printf("Failed to update job status in Firestore: %v", err)
+	}
+
+	// Update the in-memory job
 	job.Status = status
 	job.Message = message
-	job.UpdatedAt = time.Now().Unix()
+	job.UpdatedAt = now
 	if resultURL != "" {
 		job.ResultURL = resultURL
 	}
 
-	// Create update object
-	update := JobUpdate{
-		ID:        job.ID,
-		Status:    job.Status,
-		Message:   job.Message,
-		ResultURL: job.ResultURL,
-		UpdatedAt: job.UpdatedAt,
-	}
-
-	// Notify all subscribers
-	for ch := range job.Subscribers {
-		select {
-		case ch <- update:
-			// Successfully sent
-		default:
-			// Channel full or closed, will be cleaned up later
-			log.Printf("Could not send update to subscriber for job %s", job.ID)
-		}
-	}
-	job.mu.Unlock()
-
 	log.Printf("Job %s updated: status=%s, message=%s", job.ID, status, message)
+}
 
-	if status == StatusCompleted || status == StatusFailed {
-		go s.removeJob(job)
+// GetResult retrieves a job result from Firestore
+func (s *Service) GetResult(ctx context.Context, jobID string) (*FirestoreResult, error) {
+	doc, err := s.ResultsCollection().Doc(jobID).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, fmt.Errorf("result not found")
+		}
+		return nil, fmt.Errorf("error retrieving result: %v", err)
 	}
+	
+	var result FirestoreResult
+	if err := doc.DataTo(&result); err != nil {
+		return nil, fmt.Errorf("error parsing result data: %v", err)
+	}
+	
+	// Check if result has expired
+	now := time.Now().Unix()
+	if result.ExpiresAt > 0 && now > result.ExpiresAt {
+		// Result has expired, delete it
+		_, err := s.ResultsCollection().Doc(jobID).Delete(ctx)
+		if err != nil {
+			log.Printf("Failed to delete expired result %s: %v", jobID, err)
+		} else {
+			log.Printf("Deleted expired result %s", jobID)
+		}
+		return nil, fmt.Errorf("result has expired")
+	}
+	
+	return &result, nil
 } 

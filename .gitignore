@@ -1,0 +1,32 @@
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Google Cloud credentials
+*-credentials.json
+*-service-account.json
+credentials.json
+service-account.json
+gcp-key.json
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build & dist
+dist/
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE and editor folders
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store 
