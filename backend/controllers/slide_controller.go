@@ -60,6 +60,57 @@ func (c *SlideController) GenerateSlides(ctx *gin.Context) {
 		return
 	}
 
+	// Validate theme
+	isValidTheme := false
+	for _, theme := range models.ValidThemes {
+		if req.Theme == theme {
+			isValidTheme = true
+			break
+		}
+	}
+	if !isValidTheme {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Invalid theme: %s. Supported themes are: %s", req.Theme, strings.Join(models.ValidThemes, ", ")),
+		})
+		return
+	}
+
+	// Validate slideDetail setting
+	isValidSlideDetail := false
+	if req.Settings.SlideDetail != "" {
+		for _, detail := range models.ValidSlideDetails {
+			if req.Settings.SlideDetail == detail {
+				isValidSlideDetail = true
+				break
+			}
+		}
+		if !isValidSlideDetail {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("Invalid slideDetail: %s. Supported values are: %s", 
+					req.Settings.SlideDetail, strings.Join(models.ValidSlideDetails, ", ")),
+			})
+			return
+		}
+	}
+
+	// Validate audience setting
+	isValidAudience := false
+	if req.Settings.Audience != "" {
+		for _, audience := range models.ValidAudiences {
+			if req.Settings.Audience == audience {
+				isValidAudience = true
+				break
+			}
+		}
+		if !isValidAudience {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("Invalid audience: %s. Supported values are: %s", 
+					req.Settings.Audience, strings.Join(models.ValidAudiences, ", ")),
+			})
+			return
+		}
+	}
+
 	// Get files
 	form, err := ctx.MultipartForm()
 	if err != nil {
