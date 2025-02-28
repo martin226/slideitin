@@ -4,6 +4,8 @@ A powerful presentation generator that transforms documents into beautiful slide
 
 ![SlideItIn](docs/hero.png)
 
+Try it now: https://justslideitin.com/
+
 ## Overview
 
 SlideItIn is a web application that uses AI to automatically generate professional presentations from your documents. Simply upload your PDF, Markdown, or TXT files, select a visual theme, customize your settings, and let the AI create a beautifully formatted slide deck in seconds.
