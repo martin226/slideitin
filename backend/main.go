@@ -24,9 +24,16 @@ func main() {
 	// Initialize the router
 	router := gin.Default()
 
+	// Get frontend URL from environment variable
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000" // Fallback for local development
+		log.Println("Warning: FRONTEND_URL not set, using default:", frontendURL)
+	}
+
 	// Configure CORS
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"}, // Add your frontend URL
+		AllowOrigins:     []string{frontendURL}, // Use environment variable
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Cache-Control", "Connection", "Access-Control-Allow-Origin"},
 		ExposeHeaders:    []string{"Content-Length", "Content-Type", "Cache-Control", "Content-Encoding", "Transfer-Encoding"},

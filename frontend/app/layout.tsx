@@ -1,6 +1,8 @@
+import '@/lib/promise-polyfill';
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import Head from 'next/head';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -15,7 +17,7 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: "Slide it In",
-  description: "Making a presentation? Upload your documents and instantly get beautiful, presentation-ready PowerPoint slides with just one click.",
+  description: "Making a presentation? Upload your documents and instantly get beautiful, presentation-ready PowerPoint slides in < 3 minutes.",
 };
 
 export default function RootLayout({

@@ -1,0 +1,76 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: slideitin-cert
+spec:
+  domains:
+    - justslideitin.com # Actual domain
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: slideitin-ingress
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: slideitin-static-ip
+    networking.gke.io/managed-certificates: slideitin-cert
+    kubernetes.io/ingress.class: "gce"
+    cloud.google.com/neg: '{"ingress": true}'
+spec:
+  rules:
+  - host: justslideitin.com  # Actual domain
+    http:
+      paths:
+      - path: /v1
+        pathType: Prefix
+        backend:
+          service:
+            name: slideitin-backend-neg
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: slideitin-frontend-neg
+            port:
+              number: 80
+---
+apiVersion: compute.v1.beta1
+kind: BackendService
+metadata:
+  name: slideitin-backend-service
+spec:
+  backends:
+  - group: projects/slideitin/regions/us-central1/networkEndpointGroups/slideitin-backend-neg
+  enableCDN: false
+  timeoutSec: 60
+---
+apiVersion: compute.v1.beta1
+kind: BackendService
+metadata:
+  name: slideitin-frontend-service
+spec:
+  backends:
+  - group: projects/slideitin/regions/us-central1/networkEndpointGroups/slideitin-frontend-neg
+  enableCDN: true
+  timeoutSec: 60
+---
+apiVersion: compute.v1.beta1
+kind: NetworkEndpointGroup
+metadata:
+  name: slideitin-backend-neg
+spec:
+  networkEndpointType: SERVERLESS
+  cloudRun:
+    service: slideitin-backend
+    urlMask: "/<path>"
+---
+apiVersion: compute.v1.beta1
+kind: NetworkEndpointGroup
+metadata:
+  name: slideitin-frontend-neg
+spec:
+  networkEndpointType: SERVERLESS
+  cloudRun:
+    service: slideitin-frontend
+    urlMask: "/<path>" 

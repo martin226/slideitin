@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Binaries and build files
+/bin
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Testing
+*.test
+*.prof
+coverage.txt
+
+# Temporary files
+*.tmp
+*.log
+/tmp
+
+# Environment variables (except the main .env file which we want to include)
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Don't ignore .env file as we're copying it in the Dockerfile
+# !.env
+
+# Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific
+.DS_Store
+Thumbs.db 

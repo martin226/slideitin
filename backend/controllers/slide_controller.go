@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 	"path/filepath"
@@ -220,7 +221,7 @@ func (c *SlideController) StreamSlideStatus(ctx *gin.Context) {
 	ctx.Writer.Header().Set("Cache-Control", "no-cache")
 	ctx.Writer.Header().Set("Connection", "keep-alive")
 	ctx.Writer.Header().Set("Transfer-Encoding", "chunked")
-	ctx.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	ctx.Writer.Header().Set("Access-Control-Allow-Origin", os.Getenv("FRONTEND_URL"))
 	ctx.Writer.Header().Set("X-Accel-Buffering", "no") // Disable buffering in Nginx if used
 	ctx.Writer.Flush()
 
