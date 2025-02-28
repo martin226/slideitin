@@ -58,6 +58,7 @@ steps:
       - '--platform=managed'
       - '--allow-unauthenticated'
       - '--set-env-vars=NEXT_PUBLIC_API_URL=https://justslideitin.com/v1'
+      - '--set-env-vars=NEXT_PUBLIC_URL=https://justslideitin.com'
     waitFor: ['push-frontend']
 
 # Images to be stored in Container Registry

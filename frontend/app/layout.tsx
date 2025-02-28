@@ -17,6 +17,7 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "Slide it In",
   description: "Making a presentation? Upload your documents and instantly get beautiful, presentation-ready PowerPoint slides in < 3 minutes.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_URL || "https://justslideitin.com"),
 };
 
 export default function RootLayout({

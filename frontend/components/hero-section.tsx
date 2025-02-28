@@ -1,17 +1,10 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Pacifico } from "next/font/google"
 import { FileIcon as FilePresentation, ChevronRight } from "lucide-react"
-import { cn } from "@/lib/utils"
 import FloatingDocument from "./floating-document"
+import Logo from "./logo"
 import { useEffect, useRef } from "react"
-
-const pacifico = Pacifico({
-  subsets: ["latin"],
-  weight: ["400"],
-  variable: "--font-pacifico",
-})
 
 interface HeroSectionProps {
   onUploadClick: () => void;
@@ -124,14 +117,7 @@ export function HeroSection({ onUploadClick }: HeroSectionProps) {
                 just
               </motion.span>
               <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight">
-                <span
-                  className={cn(
-                    "bg-clip-text text-transparent bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500",
-                    pacifico.className,
-                  )}
-                >
-                  Slide it In
-                </span>
+                <Logo size="xl" withLink={false} className="inline-block" />
               </h1>
             </div>
           </motion.div>

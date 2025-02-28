@@ -6,6 +6,8 @@ export default function Footer() {
   return (
     <footer className="pb-4 px-4 text-center text-xs sm:text-sm bg-amber-50/80 backdrop-blur-sm text-gray-600 border-t border-amber-100/50 w-full">
       <p>
+        No data is permanently stored on our servers.
+        Read our <Link href="/privacy" className="underline hover:text-amber-600 font-medium transition-colors">Privacy Policy</Link>.
         We&apos;re{" "}
         <Link
           href="https://github.com/martin226/slideitin"
