@@ -156,7 +156,7 @@ const Success = ({ onComplete, data, setJobId }: SuccessProps) => {
         initial={{ width: 0 }}
         animate={{ width: "100%" }}
         transition={{ delay: 0.4 }}
-        className="max-w-md h-2 mx-auto bg-gray-200 rounded-full overflow-hidden"
+        className="max-w-md h-6 mx-auto bg-gray-200 rounded-full overflow-hidden shadow-inner"
       >
         <motion.div 
           initial={{ width: "0%" }}
@@ -165,8 +165,21 @@ const Success = ({ onComplete, data, setJobId }: SuccessProps) => {
             duration: 0.5, 
             ease: "easeInOut"
           }}
-          className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full"
-        ></motion.div>
+          className="h-full bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 rounded-full relative"
+        >
+          <motion.div
+            animate={{ 
+              opacity: [0.3, 0.6, 0.3],
+              scale: [1, 1.02, 1]
+            }}
+            transition={{
+              duration: 1.5,
+              repeat: Infinity,
+              repeatType: "loop"
+            }}
+            className="absolute inset-0 bg-white opacity-30 rounded-full"
+          />
+        </motion.div>
       </motion.div>
       
       <motion.p
@@ -175,7 +188,7 @@ const Success = ({ onComplete, data, setJobId }: SuccessProps) => {
         transition={{ delay: 0.6 }}
         className="text-sm text-gray-500 mt-6"
       >
-        This usually takes about 1-2 minutes depending on document size
+        This usually takes about 15 seconds to 1 minute depending on document size
       </motion.p>
     </div>
   )

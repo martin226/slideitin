@@ -3,6 +3,7 @@
 import { Download, Edit, X, RefreshCw } from "lucide-react"
 import { useState } from "react"
 import { API_BASE_URL } from "@/lib/api"
+import { PDFViewerClient } from "@/components/pdf-viewer-client"
 
 interface ResultProps {
   onRestart?: () => void;
@@ -19,7 +20,15 @@ const Result = ({ onRestart, resultUrl }: ResultProps) => {
     if (!tutorialOpen) return null;
     
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+        onClick={(e) => {
+          // Close modal when clicking the backdrop (outside the modal content)
+          if (e.target === e.currentTarget) {
+            setTutorialOpen(false);
+          }
+        }}
+      >
         <div className="bg-white rounded-lg max-w-md w-full p-6 relative">
           <button 
             onClick={() => setTutorialOpen(false)}
@@ -71,35 +80,12 @@ const Result = ({ onRestart, resultUrl }: ResultProps) => {
         </div>
         
         {/* Slides viewer with embedded PDF */}
-        <div className="w-full bg-gray-100 rounded-lg shadow-md">
-          {/* Using aspect ratio container for 16:9 */}
-          <div className="relative" style={{ paddingBottom: "56.25%" }}>
-            <iframe 
-              src={API_BASE_URL + resultUrl}
-              className="absolute inset-0 w-full h-full border-0 rounded-lg"
-              title="Slide Presentation"
-              allowFullScreen
-            />
-          </div>
-        </div>
-        
-        {/* Buttons in a row underneath */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mt-4">
-          <button 
-            className="py-3 px-6 rounded-lg bg-amber-500 hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-white font-medium"
-            onClick={() => window.open(API_BASE_URL + resultUrl + "?download=true", '_blank')}
-          >
-            <Download size={18} />
-            Download as PDF
-          </button>
-          
-          <button 
-            onClick={() => setTutorialOpen(true)}
-            className="py-3 px-6 rounded-lg bg-amber-400 hover:bg-amber-500 transition-colors flex items-center justify-center gap-2 text-white font-medium"
-          >
-            <Edit size={18} />
-            Edit
-          </button>
+        <div className="w-full">
+          <PDFViewerClient 
+            fileUrl={API_BASE_URL + resultUrl} 
+            onDownload={() => window.open(API_BASE_URL + resultUrl + "?download=true", '_blank')}
+            onEdit={() => setTutorialOpen(true)}
+          />
         </div>
       </div>
       
