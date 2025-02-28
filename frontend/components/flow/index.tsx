@@ -77,7 +77,7 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
   }
 
   const steps = [
-    { title: "Choose Theme", completed: step > 1 },
+    { title: "Theme", completed: step > 1 },
     { title: "Upload Files", completed: step > 2 },
     { title: "Settings", completed: step > 3 },
     { title: "Processing", completed: step > 4 },
