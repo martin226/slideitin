@@ -163,6 +163,9 @@ func (s *SlideService) GenerateSlides(
 		// Theme file exists, add it to the arguments
 		marpArgs = append(marpArgs, "--theme", themePath)
 		log.Printf("Using theme: %s", themePath)
+	} else {
+		marpArgs = append(marpArgs, "--theme", theme)
+		log.Printf("Using built-in theme: %s", theme)
 	}
 	
 	cmd := exec.Command("npx", marpArgs...)
