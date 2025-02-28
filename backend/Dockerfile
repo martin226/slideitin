@@ -30,7 +30,13 @@ RUN apk update && apk add --no-cache \
     freetype \
     harfbuzz \
     ttf-freefont \
-    font-noto-emoji
+    font-noto-emoji \
+    && mkdir -p /tmp/cmu-fonts /usr/share/fonts/truetype/cmu \
+    && wget -q -O /tmp/cm-unicode.tar.xz "https://sourceforge.net/projects/cm-unicode/files/cm-unicode/0.7.0/cm-unicode-0.7.0-ttf.tar.xz/download" \
+    && tar -xf /tmp/cm-unicode.tar.xz -C /tmp/cmu-fonts \
+    && cp /tmp/cmu-fonts/cm-unicode-0.7.0/*.ttf /usr/share/fonts/truetype/cmu/ \
+    && fc-cache -f \
+    && rm -rf /tmp/cmu-fonts /tmp/cm-unicode.tar.xz
 
 # Set environment variable for Chromium to run in container
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
