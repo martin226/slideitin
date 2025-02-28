@@ -22,7 +22,6 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
       audience: "general"
     }
   })
-  const [jobId, setJobId] = useState<string | null>(null)
   const [resultUrl, setResultUrl] = useState<string | null>(null)
 
   const nextStep = () => {
@@ -43,7 +42,6 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
         audience: "general"
       }
     })
-    setJobId(null)
     setResultUrl(null)
     setStep(1)
   }
@@ -164,7 +162,6 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
               {step === 4 && <Success 
                 data={data}
                 onComplete={(jobData: { resultUrl: string }) => handleJobCompletion(jobData)}
-                setJobId={setJobId}
               />}
               {step === 5 && <Result 
                 onRestart={restartFlow} 

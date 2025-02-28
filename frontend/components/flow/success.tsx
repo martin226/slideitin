@@ -2,7 +2,7 @@
 
 import { Wand2 } from "lucide-react"
 import { motion } from "framer-motion"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { generateSlides, subscribeToSlideUpdates, SlideRequest, SlideUpdate } from "../../lib/api"
 
 interface SuccessProps {
@@ -15,17 +15,16 @@ interface SuccessProps {
       audience: string;
     };
   };
-  setJobId: (id: string) => void;
 }
 
-const Success = ({ onComplete, data, setJobId }: SuccessProps) => {
+const Success = ({ onComplete, data }: SuccessProps) => {
   const [status, setStatus] = useState("Initializing...")
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const generationStarted = useRef(false)
   const jobCompleted = useRef(false)
 
-  const handleStatusUpdate = (update: SlideUpdate) => {
+  const handleStatusUpdate = useCallback((update: SlideUpdate) => {
     // Update status message
     setStatus(update.message);
     console.log("Received status update:", update);
@@ -66,7 +65,7 @@ const Success = ({ onComplete, data, setJobId }: SuccessProps) => {
       // Mark failed jobs as completed too
       jobCompleted.current = true;
     }
-  };
+  }, [setProgress, setStatus, onComplete, setError]);
 
   useEffect(() => {
     let cleanup: (() => void) | null = null;
@@ -89,11 +88,10 @@ const Success = ({ onComplete, data, setJobId }: SuccessProps) => {
         setStatus("Submitting job...")
         const response = await generateSlides(slideRequest, data.files);
         
-        // Store job ID
-        setJobId(response.id);
+        // No need to store job ID as state since it's never used
         setStatus(response.message || "Job submitted successfully");
         
-        // Subscribe to status updates via SSE
+        // Subscribe to status updates via SSE using the response ID directly
         cleanup = subscribeToSlideUpdates(
           response.id,
           handleStatusUpdate,
@@ -120,7 +118,7 @@ const Success = ({ onComplete, data, setJobId }: SuccessProps) => {
     return () => {
       if (cleanup) cleanup();
     };
-  }, [data, setJobId, onComplete, handleStatusUpdate]);
+  }, [data, onComplete, handleStatusUpdate]);
 
   return (
     <div className="w-full max-w-4xl mx-auto text-center py-12">
