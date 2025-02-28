@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import UploadFlow from "@/components/upload-flow"
 import Footer from "@/components/footer"
 import { useRouter } from "next/navigation"

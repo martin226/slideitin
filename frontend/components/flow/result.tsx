@@ -1,6 +1,6 @@
 "use client"
 
-import { Download, Edit, X, RefreshCw } from "lucide-react"
+import { RefreshCw, X } from "lucide-react"
 import { useState } from "react"
 import { API_BASE_URL } from "@/lib/api"
 import { PDFViewerClient } from "@/components/pdf-viewer-client"
@@ -44,7 +44,7 @@ const Result = ({ onRestart, resultUrl }: ResultProps) => {
               <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold">1</div>
               <div>
                 <h3 className="font-semibold text-lg">Download the PDF</h3>
-                <p className="text-gray-600">First, download your slides as a PDF using the "Download as PDF" button.</p>
+                <p className="text-gray-600">First, download your slides as a PDF using the &quot;Download as PDF&quot; button.</p>
               </div>
             </div>
             
@@ -52,12 +52,12 @@ const Result = ({ onRestart, resultUrl }: ResultProps) => {
               <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold">2</div>
               <div>
                 <h3 className="font-semibold text-lg">Convert to PowerPoint</h3>
-                <p className="text-gray-600">Go to <a href="https://www.adobe.com/acrobat/online/pdf-to-ppt.html" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Adobe's PDF to PPT converter</a>, convert your file, then edit the PowerPoint slides.</p>
+                <p className="text-gray-600">Go to <a href="https://www.adobe.com/acrobat/online/pdf-to-ppt.html" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Adobe&apos;s PDF to PPT converter</a>, convert your file, then edit the PowerPoint slides.</p>
               </div>
             </div>
 
             <p className="text-gray-600 text-xs">
-              (unfortunately, PDFs are proprietary and we cannot convert them ourselves, but Adobe's converter works almost perfectly)
+              (unfortunately, PDFs are proprietary and we cannot convert them ourselves, but Adobe&apos;s converter works almost perfectly)
             </p>
           </div>
         </div>

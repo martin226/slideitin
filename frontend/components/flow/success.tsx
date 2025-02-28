@@ -25,6 +25,49 @@ const Success = ({ onComplete, data, setJobId }: SuccessProps) => {
   const generationStarted = useRef(false)
   const jobCompleted = useRef(false)
 
+  const handleStatusUpdate = (update: SlideUpdate) => {
+    // Update status message
+    setStatus(update.message);
+    console.log("Received status update:", update);
+    
+    // Update progress based on status
+    if (update.status === "queued") {
+      setProgress(10);
+    } else if (update.status === "processing") {
+      // Determine progress based on specific status messages
+      if (update.message.includes("Analyzing")) {
+        setProgress(30);
+      } else if (update.message.includes("Generating content")) {
+        setProgress(50);
+      } else if (update.message.includes("Creating presentation")) {
+        setProgress(70);
+      } else if (update.message.includes("Finalizing")) {
+        setProgress(90);
+      } else {
+        setProgress(50); // Default for processing
+      }
+    } else if (update.status === "completed") {
+      setProgress(100);
+      console.log("Job completed with resultUrl:", update.resultUrl);
+      
+      // Mark job as completed
+      jobCompleted.current = true;
+      
+      // Store reference to prevent cleanup issues
+      const jobResultUrl = update.resultUrl;
+      
+      // Move to next step after a brief delay to show completion
+      setTimeout(() => {
+        console.log("Calling onComplete with:", { resultUrl: jobResultUrl });
+        onComplete({ resultUrl: jobResultUrl });
+      }, 1000);
+    } else if (update.status === "failed") {
+      setError(update.message || "Job failed");
+      // Mark failed jobs as completed too
+      jobCompleted.current = true;
+    }
+  };
+
   useEffect(() => {
     let cleanup: (() => void) | null = null;
 
@@ -77,50 +120,7 @@ const Success = ({ onComplete, data, setJobId }: SuccessProps) => {
     return () => {
       if (cleanup) cleanup();
     };
-  }, [data, setJobId, onComplete]);
-
-  const handleStatusUpdate = (update: SlideUpdate) => {
-    // Update status message
-    setStatus(update.message);
-    console.log("Received status update:", update);
-    
-    // Update progress based on status
-    if (update.status === "queued") {
-      setProgress(10);
-    } else if (update.status === "processing") {
-      // Determine progress based on specific status messages
-      if (update.message.includes("Analyzing")) {
-        setProgress(30);
-      } else if (update.message.includes("Generating content")) {
-        setProgress(50);
-      } else if (update.message.includes("Creating presentation")) {
-        setProgress(70);
-      } else if (update.message.includes("Finalizing")) {
-        setProgress(90);
-      } else {
-        setProgress(50); // Default for processing
-      }
-    } else if (update.status === "completed") {
-      setProgress(100);
-      console.log("Job completed with resultUrl:", update.resultUrl);
-      
-      // Mark job as completed
-      jobCompleted.current = true;
-      
-      // Store reference to prevent cleanup issues
-      const jobResultUrl = update.resultUrl;
-      
-      // Move to next step after a brief delay to show completion
-      setTimeout(() => {
-        console.log("Calling onComplete with:", { resultUrl: jobResultUrl });
-        onComplete({ resultUrl: jobResultUrl });
-      }, 1000);
-    } else if (update.status === "failed") {
-      setError(update.message || "Job failed");
-      // Mark failed jobs as completed too
-      jobCompleted.current = true;
-    }
-  };
+  }, [data, setJobId, onComplete, handleStatusUpdate]);
 
   return (
     <div className="w-full max-w-4xl mx-auto text-center py-12">

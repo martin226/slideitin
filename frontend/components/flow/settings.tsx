@@ -5,8 +5,8 @@ import { ArrowLeft, Wand2 } from "lucide-react"
 import { motion } from "framer-motion"
 
 interface SettingsProps {
-  onNext: (settings: any) => void;
-  onBack: (settings: any) => void;
+  onNext: (settings: { slideDetail: string; audience: string }) => void;
+  onBack: (settings: { slideDetail: string; audience: string }) => void;
   initialSettings: {
     slideDetail: string;
     audience: string;

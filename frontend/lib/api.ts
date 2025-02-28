@@ -1,6 +1,8 @@
 // API service for communicating with the backend
 
-export const API_BASE_URL = 'http://localhost:8080/v1';
+// Get API URL from environment variable or fall back to localhost for development
+export const API_BASE_URL = 
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/v1';
 
 // Types
 export interface SlideRequest {
@@ -86,7 +88,7 @@ export function subscribeToSlideUpdates(
   });
   
   // Handle explicit close events from server
-  eventSource.addEventListener('close', (event) => {
+  eventSource.addEventListener('close', () => {
     console.log('Server indicated stream is closing normally');
     eventSource.close();
   });

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { ChevronRight, ArrowLeft } from "lucide-react"
 import { motion } from "framer-motion"
+import Image from "next/image"
 
 // Theme Images
 import Default from "@/app/img/default.png"
@@ -53,10 +54,12 @@ const ThemeSelection = ({ onNext, onBack, initialTheme }: {
           >
             <div className={`h-32 ${theme.color} rounded-md mb-4 flex items-center justify-center relative`}>
               {theme.image ? (
-                <img 
+                <Image 
                   src={theme.image.src} 
                   alt={`${theme.name} theme preview`} 
-                  className="object-cover w-full h-full rounded-md"
+                  className="object-cover rounded-md"
+                  fill
+                  sizes="(max-width: 768px) 100vw, 33vw"
                 />
               ) : (
                 <>

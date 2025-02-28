@@ -6,7 +6,7 @@ export default function Footer() {
   return (
     <footer className="pb-4 px-4 text-center text-xs sm:text-sm bg-amber-50/80 backdrop-blur-sm text-gray-600 border-t border-amber-100/50 w-full">
       <p>
-        We're{" "}
+        We&apos;re{" "}
         <Link
           href="https://github.com/martin226/slideitin"
           className="underline hover:text-amber-600 font-medium transition-colors"

@@ -58,13 +58,13 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
     nextStep()
   }
 
-  const handleSettingsSubmit = (settings: any) => {
+  const handleSettingsSubmit = (settings: { slideDetail: string; audience: string }) => {
     setData((prev) => ({ ...prev, settings }))
     nextStep()
   }
 
   // Update settings and go back
-  const handleSettingsBack = (settings: any) => {
+  const handleSettingsBack = (settings: { slideDetail: string; audience: string }) => {
     setData((prev) => ({ ...prev, settings }))
     prevStep()
   }
