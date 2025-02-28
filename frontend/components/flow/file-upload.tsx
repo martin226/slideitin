@@ -26,9 +26,13 @@ const FileUpload = ({ onNext, onBack, initialFiles }: {
     e.preventDefault()
     setIsDragging(false)
     
-    // allow PDF, MD, TXT
+    // allow PDF, MD, TXT - check both MIME type and file extension for .md files
     const droppedFiles = Array.from(e.dataTransfer.files).filter(
-      (file) => file.type === "application/pdf" || file.type === "text/markdown" || file.type === "text/plain"
+      (file) => 
+        file.type === "application/pdf" || 
+        file.type === "text/markdown" || 
+        file.type === "text/plain" ||
+        file.name.toLowerCase().endsWith('.md')
     )
     
     if (droppedFiles.length > 0) {
@@ -39,7 +43,11 @@ const FileUpload = ({ onNext, onBack, initialFiles }: {
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) {
       const selectedFiles = Array.from(e.target.files).filter(
-        (file) => file.type === "application/pdf" || file.type === "text/markdown" || file.type === "text/plain"
+        (file) => 
+          file.type === "application/pdf" || 
+          file.type === "text/markdown" || 
+          file.type === "text/plain" ||
+          file.name.toLowerCase().endsWith('.md')
       )
       setFiles((prev) => [...prev, ...selectedFiles])
     }

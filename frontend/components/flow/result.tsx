@@ -1,8 +1,8 @@
 "use client"
 
 import { Download, Edit, X, RefreshCw } from "lucide-react"
-import { motion } from "framer-motion"
 import { useState } from "react"
+import { API_BASE_URL } from "@/lib/api"
 
 interface ResultProps {
   onRestart?: () => void;
@@ -46,6 +46,10 @@ const Result = ({ onRestart, resultUrl }: ResultProps) => {
                 <p className="text-gray-600">Go to <a href="https://www.adobe.com/acrobat/online/pdf-to-ppt.html" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Adobe's PDF to PPT converter</a>, convert your file, then edit the PowerPoint slides.</p>
               </div>
             </div>
+
+            <p className="text-gray-600 text-xs">
+              (unfortunately, PDFs are proprietary and we cannot convert them ourselves, but Adobe's converter works almost perfectly)
+            </p>
           </div>
         </div>
       </div>
@@ -66,20 +70,16 @@ const Result = ({ onRestart, resultUrl }: ResultProps) => {
           </button>
         </div>
         
-        {/* Slides viewer (placeholder) with 16:9 aspect ratio */}
+        {/* Slides viewer with embedded PDF */}
         <div className="w-full bg-gray-100 rounded-lg shadow-md">
           {/* Using aspect ratio container for 16:9 */}
           <div className="relative" style={{ paddingBottom: "56.25%" }}>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <p className="text-gray-500 text-lg">Slides Preview Placeholder</p>
-              {/* Display the result URL as text */}
-              <div className="mt-4 p-4 bg-white rounded-md shadow-sm">
-                <p className="text-gray-700 text-sm font-mono break-all">
-                  {/* Temporary placeholder - in a real implementation, this would be replaced with actual slide rendering */}
-                  Download Link: {resultUrl}
-                </p>
-              </div>
-            </div>
+            <iframe 
+              src={API_BASE_URL + resultUrl}
+              className="absolute inset-0 w-full h-full border-0 rounded-lg"
+              title="Slide Presentation"
+              allowFullScreen
+            />
           </div>
         </div>
         
@@ -87,7 +87,7 @@ const Result = ({ onRestart, resultUrl }: ResultProps) => {
         <div className="flex flex-col sm:flex-row gap-4 justify-center mt-4">
           <button 
             className="py-3 px-6 rounded-lg bg-amber-500 hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-white font-medium"
-            onClick={() => window.open(resultUrl, '_blank')}
+            onClick={() => window.open(API_BASE_URL + resultUrl + "?download=true", '_blank')}
           >
             <Download size={18} />
             Download as PDF

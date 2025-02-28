@@ -73,26 +73,26 @@ type JobUpdate struct {
 type Service struct {
 	client    *firestore.Client
 	mu        sync.RWMutex
-	geminiSvc interface {
+	slideSvc interface {
 		GenerateSlides(ctx context.Context, theme string, files []struct {
 			Filename string
 			Data     []byte
 			Type     string
-		}, settings models.SlideSettings, statusUpdateFn func(message string) error) (string, []byte, error)
+		}, settings models.SlideSettings, statusUpdateFn func(message string) error) ([]byte, error)
 	}
 }
 
 // NewService creates a new queue service using Firestore
-func NewService(client *firestore.Client, geminiSvc interface {
+func NewService(client *firestore.Client, slideSvc interface {
 	GenerateSlides(ctx context.Context, theme string, files []struct {
 		Filename string
 		Data     []byte
 		Type     string
-	}, settings models.SlideSettings, statusUpdateFn func(message string) error) (string, []byte, error)
+	}, settings models.SlideSettings, statusUpdateFn func(message string) error) ([]byte, error)
 }) *Service {
 	s := &Service{
 		client:    client,
-		geminiSvc: geminiSvc,
+		slideSvc: slideSvc,
 	}
 
 	return s
@@ -304,7 +304,7 @@ func (s *Service) processJob(job *Job) {
 
 	// Call the Gemini service with the status update function
 	ctx := context.Background()
-	resultID, pdfData, err := s.geminiSvc.GenerateSlides(
+	pdfData, err := s.slideSvc.GenerateSlides(
 		ctx, 
 		job.Theme, 
 		job.Files, 
@@ -318,7 +318,7 @@ func (s *Service) processJob(job *Job) {
 	}
 
 	// Create result URL
-	resultURL := "/api/v1/results/" + resultID
+	resultURL := "/results/" + job.ID
 
 	// Store result in Firestore
 	s.storeResult(ctx, job.ID, resultURL, pdfData)

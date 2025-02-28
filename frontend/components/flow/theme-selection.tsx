@@ -4,6 +4,14 @@ import { useState } from "react"
 import { ChevronRight, ArrowLeft } from "lucide-react"
 import { motion } from "framer-motion"
 
+// Theme Images
+import Default from "@/app/img/default.png"
+import Beam from "@/app/img/beam.png"
+import Gaia from "@/app/img/gaia.png"
+import Uncover from "@/app/img/uncover.png"
+import GraphPaper from "@/app/img/graph_paper.png"
+import RosePine from "@/app/img/rose_pine.png"
+
 // Theme Selection Component
 const ThemeSelection = ({ onNext, onBack, initialTheme }: { 
   onNext: (theme: string) => void; 
@@ -12,12 +20,12 @@ const ThemeSelection = ({ onNext, onBack, initialTheme }: {
 }) => {
   const [selectedTheme, setSelectedTheme] = useState(initialTheme)
   const themes = [
-    { id: "minimal", name: "Minimal", color: "bg-gray-50" },
-    { id: "corporate", name: "Corporate", color: "bg-blue-50" },
-    { id: "creative", name: "Creative", color: "bg-purple-50" },
-    { id: "academic", name: "Academic", color: "bg-amber-50/70" },
-    { id: "modern", name: "Modern", color: "bg-pink-50" },
-    { id: "elegant", name: "Elegant", color: "bg-orange-50" },
+    { id: "default", name: "Default", color: "bg-gray-50", image: Default },
+    { id: "beam", name: "Beam", color: "bg-blue-50", image: Beam },
+    { id: "rose_pine", name: "Rose Pine", color: "bg-purple-50", image: RosePine },
+    { id: "gaia", name: "Gaia", color: "bg-amber-50/70", image: Gaia},
+    { id: "uncover", name: "Uncover", color: "bg-green-50", image: Uncover },
+    { id: "graph_paper", name: "Graph Paper", color: "bg-orange-50", image: GraphPaper },
   ]
 
   return (
@@ -44,8 +52,18 @@ const ThemeSelection = ({ onNext, onBack, initialTheme }: {
             className={`border-2 ${selectedTheme === theme.id ? 'border-amber-500' : 'border-gray-200'} hover:border-amber-500 rounded-lg p-5 cursor-pointer transition-all overflow-hidden`}
           >
             <div className={`h-32 ${theme.color} rounded-md mb-4 flex items-center justify-center relative`}>
-              <div className="absolute inset-0 bg-gradient-to-br from-transparent to-white/20"></div>
-              <span className="text-gray-700 font-medium relative z-10">{theme.name} Preview</span>
+              {theme.image ? (
+                <img 
+                  src={theme.image.src} 
+                  alt={`${theme.name} theme preview`} 
+                  className="object-cover w-full h-full rounded-md"
+                />
+              ) : (
+                <>
+                  <div className="absolute inset-0 bg-gradient-to-br from-transparent to-white/20"></div>
+                  <span className="text-gray-700 font-medium relative z-10">{theme.name}</span>
+                </>
+              )}
             </div>
             <p className="font-medium text-gray-700 text-center">{theme.name}</p>
           </motion.div>

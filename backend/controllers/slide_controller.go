@@ -14,20 +14,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/slideitin/backend/models"
-	"github.com/slideitin/backend/services/gemini"
+	"github.com/slideitin/backend/services/slides"
 	"github.com/slideitin/backend/services/queue"
 )
 
 // SlideController handles the slide generation API endpoints
 type SlideController struct {
-	geminiService *gemini.Service
+	slideService  *slides.SlideService
 	queueService  *queue.Service
 }
 
 // NewSlideController creates a new slide controller
-func NewSlideController(geminiService *gemini.Service, queueService *queue.Service) *SlideController {
+func NewSlideController(slideService *slides.SlideService, queueService *queue.Service) *SlideController {
 	return &SlideController{
-		geminiService: geminiService,
+		slideService: slideService,
 		queueService:  queueService,
 	}
 }
@@ -107,6 +107,11 @@ func (c *SlideController) GenerateSlides(ctx *gin.Context) {
 		// Detect MIME type from file content instead of using header
 		// DetectContentType only needs the first 512 bytes
 		mimeType := http.DetectContentType(data)
+		
+		// Remove charset information if present
+		if semicolonIndex := strings.Index(mimeType, ";"); semicolonIndex != -1 {
+			mimeType = strings.TrimSpace(mimeType[:semicolonIndex])
+		}
 		
 		// Validate file type - only allow PDF, Markdown and TXT
 		isAllowed := false
@@ -296,7 +301,14 @@ func (c *SlideController) GetSlideResult(ctx *gin.Context) {
 		return
 	}
 
-	ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=presentation-%s.pdf", id))
+	download := ctx.Query("download")
+
+	if download == "true" {
+		ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=presentation-%s.pdf", id))
+	} else {
+		ctx.Header("Content-Type", "application/pdf")
+	}
+
 	ctx.Data(http.StatusOK, "application/pdf", result.PDFData)
 	return
 } 

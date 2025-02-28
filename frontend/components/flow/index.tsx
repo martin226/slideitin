@@ -19,7 +19,7 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
     files: [] as File[],
     settings: {
       slideDetail: "medium",
-      audience: "professional"
+      audience: "general"
     }
   })
   const [jobId, setJobId] = useState<string | null>(null)
@@ -40,7 +40,7 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
       files: [],
       settings: {
         slideDetail: "medium",
-        audience: "professional"
+        audience: "general"
       }
     })
     setJobId(null)
@@ -136,7 +136,7 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
         </motion.div>
 
         {/* Form steps - positioned slightly higher than center */}
-        <div className="flex-1 flex items-start justify-center py-16">
+        <div className="flex-1 flex items-start justify-center pt-10 pb-16">
           <AnimatePresence mode="wait">
             <motion.div
               key={step}

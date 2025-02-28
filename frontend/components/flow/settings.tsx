@@ -15,7 +15,7 @@ interface SettingsProps {
 
 const Settings = ({ onNext, onBack, initialSettings }: SettingsProps) => {
   const [slideDetail, setSlideDetail] = useState(initialSettings.slideDetail || "medium")
-  const [audience, setAudience] = useState(initialSettings.audience || "professional")
+  const [audience, setAudience] = useState(initialSettings.audience || "general")
 
   const handleSubmit = () => {
     onNext({
@@ -86,10 +86,10 @@ const Settings = ({ onNext, onBack, initialSettings }: SettingsProps) => {
             onChange={(e) => setAudience(e.target.value)}
             className="w-full p-4 border rounded-lg focus:border-amber-500 focus:ring focus:ring-amber-200 focus:ring-opacity-50 transition-all"
           >
-            <option value="professional">Professional</option>
-            <option value="academic">Academic</option>
             <option value="general">General</option>
+            <option value="academic">Academic</option>
             <option value="technical">Technical</option>
+            <option value="professional">Business</option>
             <option value="executive">Executive</option>
           </select>
           <p className="text-sm text-gray-500 mt-2 ml-1">

@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/slideitin/backend/controllers"
-	"github.com/slideitin/backend/services/gemini"
+	"github.com/slideitin/backend/services/slides"
 	"github.com/slideitin/backend/services/queue"
 )
 
@@ -57,13 +57,13 @@ func main() {
 	defer firestoreClient.Close()
 
 	// Initialize services
-	geminiService := gemini.NewService(apiKey)
+	slideService := slides.NewSlideService(apiKey)
 	
 	// Initialize queue service with Firestore and Gemini service
-	queueService := queue.NewService(firestoreClient, geminiService)
+	queueService := queue.NewService(firestoreClient, slideService)
 
 	// Initialize controllers
-	slideController := controllers.NewSlideController(geminiService, queueService)
+	slideController := controllers.NewSlideController(slideService, queueService)
 
 	// API routes
 	v1 := router.Group("/v1")
