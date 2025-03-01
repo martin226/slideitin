@@ -1,14 +1,14 @@
-# SlideItIn
+# Slide it In
 
 A powerful presentation generator that transforms documents into beautiful slide decks using AI.
 
-![SlideItIn](docs/hero.png)
+![Slide it In](docs/hero.png)
 
 Try it now: https://justslideitin.com/
 
 ## Overview
 
-SlideItIn is a web application that uses AI to automatically generate professional presentations from your documents. Simply upload your PDF, Markdown, or TXT files, select a visual theme, customize your settings, and let the AI create a beautifully formatted slide deck in seconds.
+Slide it In is a web application that uses AI to automatically generate professional presentations from your documents. Simply upload your PDF, Markdown, or TXT files, select a visual theme, customize your settings, and let the AI create a beautifully formatted slide deck in seconds.
 
 ## Features
 
@@ -133,10 +133,6 @@ GEMINI_API_KEY=your_gemini_api_key
 GOOGLE_CLOUD_PROJECT=your_gcp_project_id
 GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
 ```
-
-## Deployment
-
-The application can be deployed to any cloud provider that supports Go and Next.js applications. For production deployment, consider setting up a CI/CD pipeline and using containerization with Docker.
 
 ## License
 
