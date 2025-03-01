@@ -134,14 +134,14 @@ const FileUpload = ({ onNext, onBack, initialFiles }: {
         {/* Middle divider - Only visible on desktop */}
         <div className="hidden md:flex flex-col items-center justify-center">
           <div className="h-36 w-px bg-gray-300"></div>
-          <div className="py-3 px-4 rounded-full text-amber-800 font-medium my-2">or</div>
+          <div className="py-3 px-4 rounded-full bg-amber-100 text-amber-800 font-medium my-2">or</div>
           <div className="h-36 w-px bg-gray-300"></div>
         </div>
 
         {/* Mobile divider */}
         <div className="md:hidden flex items-center justify-center mb-2">
           <div className="flex-1 h-px bg-gray-300"></div>
-          <div className="px-4 py-1 rounded-full bg-amber-100 text-amber-800 font-medium mx-4">or</div>
+          <div className="py-3 px-4 rounded-full bg-amber-100 text-amber-800 font-medium mx-4">or</div>
           <div className="flex-1 h-px bg-gray-300"></div>
         </div>
 
