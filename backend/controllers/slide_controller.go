@@ -357,10 +357,10 @@ func (c *SlideController) GetSlideResult(ctx *gin.Context) {
 
 	if download == "true" {
 		ctx.Header("Content-Disposition", fmt.Sprintf("attachment; filename=presentation-%s.pdf", id))
+		ctx.Data(http.StatusOK, "application/pdf", result.PDFData)
 	} else {
-		ctx.Header("Content-Type", "application/pdf")
+		ctx.Header("Content-Type", "text/html")
+		ctx.Data(http.StatusOK, "text/html", result.HTMLData)
 	}
-
-	ctx.Data(http.StatusOK, "application/pdf", result.PDFData)
 	return
 } 

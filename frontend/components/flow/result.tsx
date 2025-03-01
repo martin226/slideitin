@@ -1,9 +1,8 @@
 "use client"
 
-import { RefreshCw, X } from "lucide-react"
+import { RefreshCw, X, Download, Edit } from "lucide-react"
 import { useState } from "react"
 import { API_BASE_URL } from "@/lib/api"
-import { PDFViewerClient } from "@/components/pdf-viewer-client"
 
 interface ResultProps {
   onRestart?: () => void;
@@ -65,6 +64,14 @@ const Result = ({ onRestart, resultUrl }: ResultProps) => {
     );
   };
 
+  const handleDownload = () => {
+    window.open(API_BASE_URL + resultUrl + "?download=true", '_blank');
+  };
+
+  const handleEdit = () => {
+    setTutorialOpen(true);
+  };
+
   return (
     <div className="w-full max-w-7xl mx-auto p-6">
       <div className="flex flex-col gap-6">
@@ -79,13 +86,35 @@ const Result = ({ onRestart, resultUrl }: ResultProps) => {
           </button>
         </div>
         
-        {/* Slides viewer with embedded PDF */}
-        <div className="w-full">
-          <PDFViewerClient 
-            fileUrl={API_BASE_URL + resultUrl} 
-            onDownload={() => window.open(API_BASE_URL + resultUrl + "?download=true", '_blank')}
-            onEdit={() => setTutorialOpen(true)}
-          />
+        {/* Slides viewer using iframe */}
+        <div className="w-full flex flex-col items-center gap-6">
+          {/* Responsive iframe container with 16:9 aspect ratio */}
+          <div className="w-full relative shadow-lg" style={{ paddingBottom: "56.25%" }}>
+            <iframe 
+              src={API_BASE_URL + resultUrl}
+              className="absolute top-0 left-0 w-full h-full rounded-lg"
+              title="Slides viewer"
+            />
+          </div>
+          
+          {/* Action buttons */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button 
+              className="py-2 px-4 rounded-lg bg-amber-500 hover:bg-amber-600 transition-colors flex items-center justify-center gap-2 text-white font-medium"
+              onClick={handleDownload}
+            >
+              <Download size={16} />
+              Download as PDF
+            </button>
+            
+            <button 
+              onClick={handleEdit}
+              className="py-2 px-4 rounded-lg bg-amber-400 hover:bg-amber-500 transition-colors flex items-center justify-center gap-2 text-white font-medium"
+            >
+              <Edit size={16} />
+              Edit in PowerPoint
+            </button>
+          </div>
         </div>
       </div>
       

@@ -39,6 +39,7 @@ type FirestoreResult struct {
 	ID          string `firestore:"id"`
 	ResultURL   string `firestore:"resultUrl"`
 	PDFData     []byte `firestore:"pdfData"`
+	HTMLData    []byte `firestore:"htmlData"`
 	CreatedAt   int64  `firestore:"createdAt"`
 	ExpiresAt   int64  `firestore:"expiresAt"`
 }
@@ -78,7 +79,7 @@ type Service struct {
 			Filename string
 			Data     []byte
 			Type     string
-		}, settings models.SlideSettings, statusUpdateFn func(message string) error) ([]byte, error)
+		}, settings models.SlideSettings, statusUpdateFn func(message string) error) ([]byte, []byte, error)
 	}
 }
 
@@ -88,7 +89,7 @@ func NewService(client *firestore.Client, slideSvc interface {
 		Filename string
 		Data     []byte
 		Type     string
-	}, settings models.SlideSettings, statusUpdateFn func(message string) error) ([]byte, error)
+	}, settings models.SlideSettings, statusUpdateFn func(message string) error) ([]byte, []byte, error)
 }) *Service {
 	s := &Service{
 		client:    client,
@@ -304,7 +305,7 @@ func (s *Service) processJob(job *Job) {
 
 	// Call the Gemini service with the status update function
 	ctx := context.Background()
-	pdfData, err := s.slideSvc.GenerateSlides(
+	pdfData, htmlData, err := s.slideSvc.GenerateSlides(
 		ctx, 
 		job.Theme, 
 		job.Files, 
@@ -321,7 +322,7 @@ func (s *Service) processJob(job *Job) {
 	resultURL := "/results/" + job.ID
 
 	// Store result in Firestore
-	s.storeResult(ctx, job.ID, resultURL, pdfData)
+	s.storeResult(ctx, job.ID, resultURL, pdfData, htmlData)
 
 	// Update job as completed and set to expire in 5 minutes
 	s.setJobCompleted(job, "Slides generated successfully", resultURL)
@@ -357,7 +358,7 @@ func (s *Service) setJobCompleted(job *Job, message, resultURL string) {
 }
 
 // storeResult stores a job result in Firestore
-func (s *Service) storeResult(ctx context.Context, jobID, resultURL string, pdfData []byte) error {
+func (s *Service) storeResult(ctx context.Context, jobID, resultURL string, pdfData []byte, htmlData []byte) error {
 	now := time.Now().Unix()
 	// Set expiration time to 1 hour from now
 	expiresAt := now + 3600
@@ -366,6 +367,7 @@ func (s *Service) storeResult(ctx context.Context, jobID, resultURL string, pdfD
 		ID:          jobID,
 		ResultURL:   resultURL,
 		PDFData:     pdfData,
+		HTMLData:    htmlData,
 		CreatedAt:   now,
 		ExpiresAt:   expiresAt,
 	}

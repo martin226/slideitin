@@ -50,10 +50,10 @@ func (s *SlideService) GenerateSlides(
 	},
 	settings models.SlideSettings,
 	statusUpdateFn func(message string) error,
-) ([]byte, error) {
+) ([]byte, []byte, error) {
 	// Update status to show we're processing the files
 	if err := statusUpdateFn("Analyzing uploaded files"); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	geminiFiles := make([]*genai.File, 0, len(files))
@@ -69,7 +69,7 @@ func (s *SlideService) GenerateSlides(
 		})
 		if err != nil {
 			log.Printf("Failed to upload file to Gemini: %v", err)
-			return nil, err
+			return nil, nil, err
 		}
 		geminiFiles = append(geminiFiles, geminiFile)
 		log.Printf("Processing file: %s (%s)", file.Filename, file.Type)
@@ -77,20 +77,20 @@ func (s *SlideService) GenerateSlides(
 
 	// Update status to show we're generating the prompt
 	if err := statusUpdateFn("Generating content for slides"); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	
 	// 2. Generate the prompt using the prompt generator
 	prompt, err := prompts.GenerateSlidePrompt(theme, settings)
 	if err != nil {
 		log.Printf("Error generating prompt: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 	log.Printf("Prompt: %s", prompt)
 	
 	// Update status to show we're sending to Gemini
 	if err := statusUpdateFn("Creating presentation with AI"); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	
 	// 3. Send the prompt to Gemini
@@ -104,17 +104,17 @@ func (s *SlideService) GenerateSlides(
 	countResp, err := s.model.CountTokens(ctx, parts...)
 	if err != nil {
 		log.Printf("Failed to count tokens: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 	if countResp.TotalTokens > 16384 {
 		log.Printf("Input tokens exceed 16384: %d", countResp.TotalTokens)
-		return nil, errors.New("documents are too large to process")
+		return nil, nil, errors.New("documents are too large to process")
 	}
 
 	resp, err := s.model.GenerateContent(ctx, parts...)
 	if err != nil {
 		log.Printf("Failed to generate content: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	respText := resp.Candidates[0].Content.Parts[0].(genai.Text)
@@ -125,21 +125,21 @@ func (s *SlideService) GenerateSlides(
 	
 	if marpText == "" {
 		log.Printf("No markdown found in response: %s", respText)
-		return nil, errors.New("failed to generate presentation. Please try again.")
+		return nil, nil, errors.New("failed to generate presentation. Please try again.")
 	}
 
 	log.Printf("Generated presentation: %s", marpText)
 	
 	// Update status to show we're finalizing the presentation
 	if err := statusUpdateFn("Finalizing presentation"); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Create a temporary directory for our files
 	tempDir, err := os.MkdirTemp("", "slideitin-")
 	if err != nil {
 		log.Printf("Failed to create temp directory: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 	defer os.RemoveAll(tempDir) // Clean up when we're done
 	
@@ -148,14 +148,14 @@ func (s *SlideService) GenerateSlides(
 	err = os.WriteFile(mdFilePath, []byte(marpText), 0644)
 	if err != nil {
 		log.Printf("Failed to write markdown file: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 	
 	// Set up PDF output path
 	pdfFilePath := filepath.Join(tempDir, "presentation.pdf")
 	
 	// Run Marp CLI to generate the PDF
-	marpArgs := []string{"@marp-team/marp-cli", mdFilePath, "--pdf", "--output", pdfFilePath}
+	marpArgs := []string{"@marp-team/marp-cli", mdFilePath}
 	
 	// Add theme parameter if it's in themes directory
 	themePath := filepath.Join("services", "slides", "themes", theme+".css")
@@ -168,7 +168,7 @@ func (s *SlideService) GenerateSlides(
 		log.Printf("Using built-in theme: %s", theme)
 	}
 	
-	cmd := exec.Command("npx", marpArgs...)
+	cmd := exec.Command("npx", append(marpArgs, "--output", pdfFilePath, "--pdf")...)
 	var cmdOutput bytes.Buffer
 	var cmdError bytes.Buffer
 	cmd.Stdout = &cmdOutput
@@ -177,18 +177,43 @@ func (s *SlideService) GenerateSlides(
 	if err != nil {
 		log.Printf("Failed to run Marp CLI: %v", err)
 		log.Printf("Marp CLI stderr: %s", cmdError.String())
-		return nil, errors.New("failed to generate PDF. Please try again.")
+		return nil, nil, errors.New("failed to generate PDF. Please try again.")
 	}
 	
 	// Read the generated PDF
 	pdfBytes, err := os.ReadFile(pdfFilePath)
 	if err != nil {
 		log.Printf("Failed to read generated PDF: %v", err)
-		return nil, err
+		return nil, nil, err
 	}
 	
 	log.Printf("Successfully generated PDF (%d bytes)", len(pdfBytes))
 
+	// Create the HTML file
+	htmlFilePath := filepath.Join(tempDir, "presentation.html")
+
+	// Run Marp CLI to generate the HTML
+	cmd = exec.Command("npx", append(marpArgs, "--output", htmlFilePath, "--html")...)
+	cmdOutput.Reset()
+	cmdError.Reset()
+	cmd.Stdout = &cmdOutput
+	cmd.Stderr = &cmdError
+	err = cmd.Run()
+	if err != nil {
+		log.Printf("Failed to run Marp CLI: %v", err)
+		log.Printf("Marp CLI stderr: %s", cmdError.String())
+		return nil, nil, errors.New("failed to generate HTML. Please try again.")
+	}
+
+	// Read the generated HTML
+	htmlBytes, err := os.ReadFile(htmlFilePath)
+	if err != nil {
+		log.Printf("Failed to read generated HTML: %v", err)
+		return nil, nil, err
+	}
+
+	log.Printf("Successfully generated HTML (%d bytes)", len(htmlBytes))
+	
 	// Delete the files from Gemini
 	for _, file := range geminiFiles {
 		err := s.client.DeleteFile(ctx, file.Name)
@@ -197,8 +222,8 @@ func (s *SlideService) GenerateSlides(
 		}
 	}
 	
-	// Return the presentation ID and PDF bytes
-	return pdfBytes, nil
+	// Return the PDF and HTML bytes
+	return pdfBytes, htmlBytes, nil
 }
 
 // extractMarkdownContent extracts markdown content between triple backticks
