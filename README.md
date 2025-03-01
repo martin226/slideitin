@@ -27,7 +27,6 @@ Slide it In is a web application that uses AI to automatically generate professi
 - TypeScript
 - Tailwind CSS for styling
 - Framer Motion for animations
-- React-PDF for PDF preview
 
 ### Backend
 - Go (Gin web framework)
