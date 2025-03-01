@@ -24,6 +24,12 @@ function toDataURL(url: string) {
         }));
 }
 
+// Function to detect Safari browser
+function isSafari() {
+    if (typeof window === 'undefined') return false;
+    return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
+
 export function PDFViewerClient({ fileUrl, onDownload, onEdit }: PDFViewerClientProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [pageNumber, setPageNumber] = useState<number>(1);
@@ -32,6 +38,7 @@ export function PDFViewerClient({ fileUrl, onDownload, onEdit }: PDFViewerClient
     const [dataUrl, setDataUrl] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const documentLoaded = useRef<boolean>(false); // Track if document is loaded
+    const [isSafariBrowser, setIsSafariBrowser] = useState<boolean>(false);
     
     // Memoize the PDF.js options to prevent unnecessary rerenders
     const pdfOptions = useMemo(() => ({
@@ -56,6 +63,9 @@ export function PDFViewerClient({ fileUrl, onDownload, onEdit }: PDFViewerClient
         };
         
         loadPdf();
+        
+        // Detect if browser is Safari
+        setIsSafariBrowser(isSafari());
         
         // Cleanup function to ensure any remaining worker tasks are cleanly terminated
         return () => {
@@ -247,6 +257,13 @@ export function PDFViewerClient({ fileUrl, onDownload, onEdit }: PDFViewerClient
                     )}
                 </div>
             </div>
+            
+            {/* Safari-specific message */}
+            {isSafariBrowser && onDownload && (
+                <div className="mt-4 text-center text-sm text-amber-600">
+                    Not rendering properly? <button onClick={onDownload} className="underline hover:text-amber-700">Download the PDF</button> instead. This is a known issue with Safari.
+                </div>
+            )}
         </div>
     );
 }
