@@ -134,7 +134,7 @@ export default function UploadFlow({ onBack }: { onBack?: () => void }) {
         </motion.div>
 
         {/* Form steps - positioned slightly higher than center */}
-        <div className="flex-1 flex items-start justify-center pt-10 pb-16">
+        <div className="flex-1 flex items-start justify-center mt-10 mb-16">
           <AnimatePresence mode="wait">
             <motion.div
               key={step}

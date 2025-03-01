@@ -20,9 +20,11 @@ export default function StartPage() {
           <Logo size="lg" withAnimation={true} />
         </div>
         
-        <UploadFlow onBack={handleBackToHome} />
+        <div className="flex-1">
+          <UploadFlow onBack={handleBackToHome} />
+        </div>
+        <Footer />
       </div>
-      <Footer />
     </div>
   )
 } 

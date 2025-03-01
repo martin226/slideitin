@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronRight, Upload, ArrowLeft } from "lucide-react"
+import { ChevronRight, Upload, ArrowLeft, FileText } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 // File Upload Component
@@ -12,6 +12,7 @@ const FileUpload = ({ onNext, onBack, initialFiles }: {
 }) => {
   const [files, setFiles] = useState<File[]>(initialFiles)
   const [isDragging, setIsDragging] = useState(false)
+  const [textContent, setTextContent] = useState("")
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -57,55 +58,114 @@ const FileUpload = ({ onNext, onBack, initialFiles }: {
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const handleTextContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setTextContent(e.target.value)
+  }
+
+  const handleSubmit = () => {
+    // If we have text content, convert it to a File object
+    if (textContent.trim()) {
+      const textBlob = new Blob([textContent], { type: 'text/plain' })
+      const textFile = new File([textBlob], 'content.txt', { type: 'text/plain' })
+      
+      onNext([...files, textFile])
+    } else {
+      onNext(files)
+    }
+  }
+
+  const hasContent = files.length > 0 || textContent.trim().length > 0
+
   return (
     <div className="w-full max-w-4xl mx-auto">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">Upload Documents</h2>
       
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={`border-2 border-dashed rounded-lg p-10 text-center ${
-          isDragging ? "border-amber-500 bg-amber-50" : "border-gray-300"
-        } transition-colors mb-8 relative overflow-hidden`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        {isDragging && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.15 }}
-            className="absolute inset-0 bg-amber-200 z-0"
-          />
-        )}
-        <motion.div
-          initial={{ scale: 0.9 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 300, damping: 20 }}
-          className="relative z-10"
-        >
-          <Upload className="mx-auto h-16 w-16 text-amber-500 mb-4" />
-          <p className="text-xl text-gray-700 mb-2 font-medium">
-            Drag and drop your files here
-          </p>
-          <p className="text-md text-gray-500 mb-6">or click to browse your files</p>
-          <input
-            type="file"
-            id="file-upload"
-            className="hidden"
-            multiple
-            accept=".pdf, .md, .txt"
-            onChange={handleFileInput}
-          />
-          <label
-            htmlFor="file-upload"
-            className="px-6 py-3 border border-gray-300 rounded-md text-gray-700 font-medium cursor-pointer hover:bg-gray-50 transition-colors inline-flex items-center gap-2"
+      {/* Split container for desktop, column for mobile */}
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6 mb-8">
+        {/* Left side - File upload */}
+        <div className="w-full md:w-1/2">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`border-2 border-dashed rounded-lg p-6 md:p-8 text-center h-full ${
+              isDragging ? "border-amber-500 bg-amber-50" : "border-gray-300"
+            } transition-colors relative overflow-hidden`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
           >
-            <span>Browse Files</span>
-          </label>
-          <p className="text-sm text-gray-500 mt-6">Supports PDF, MD, and TXT files</p>
-        </motion.div>
-      </motion.div>
+            {isDragging && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.15 }}
+                className="absolute inset-0 bg-amber-200 z-0"
+              />
+            )}
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className="relative z-10 h-full flex flex-col justify-center items-center"
+            >
+              <Upload className="mx-auto h-12 w-12 md:h-16 md:w-16 text-amber-500 mb-4" />
+              <p className="text-lg md:text-xl text-gray-700 mb-2 font-medium">
+                Drag and drop your files here
+              </p>
+              <p className="text-sm md:text-md text-gray-500 mb-4 md:mb-6">or click to browse your files</p>
+              <input
+                type="file"
+                id="file-upload"
+                className="hidden"
+                multiple
+                accept=".pdf, .md, .txt"
+                onChange={handleFileInput}
+              />
+              <label
+                htmlFor="file-upload"
+                className="px-4 py-2 md:px-6 md:py-3 border border-gray-300 rounded-md text-gray-700 font-medium cursor-pointer hover:bg-gray-50 transition-colors inline-flex items-center gap-2"
+              >
+                <span>Browse Files</span>
+              </label>
+              <p className="text-xs md:text-sm text-gray-500 mt-4 md:mt-6">Supports PDF, MD, and TXT files</p>
+            </motion.div>
+          </motion.div>
+        </div>
+
+        {/* Middle divider - Only visible on desktop */}
+        <div className="hidden md:flex flex-col items-center justify-center">
+          <div className="h-36 w-px bg-gray-300"></div>
+          <div className="py-3 px-4 rounded-full text-amber-800 font-medium my-2">or</div>
+          <div className="h-36 w-px bg-gray-300"></div>
+        </div>
+
+        {/* Mobile divider */}
+        <div className="md:hidden flex items-center justify-center mb-2">
+          <div className="flex-1 h-px bg-gray-300"></div>
+          <div className="px-4 py-1 rounded-full bg-amber-100 text-amber-800 font-medium mx-4">or</div>
+          <div className="flex-1 h-px bg-gray-300"></div>
+        </div>
+
+        {/* Right side - Text content */}
+        <div className="w-full md:w-1/2 flex flex-col">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="border-2 border-gray-300 rounded-lg flex flex-col flex-grow h-full"
+          >
+            <div className="p-3 flex items-center border-b border-gray-200 flex-shrink-0">
+              <FileText className="h-5 w-5 text-amber-500 mr-2" />
+              <h3 className="text-sm font-medium text-gray-700">Paste your content here</h3>
+            </div>
+            <textarea
+              className="w-full flex-grow p-4 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-b-lg min-h-[200px]"
+              placeholder="This will be used in addition to any files you upload."
+              autoFocus
+              value={textContent}
+              onChange={handleTextContentChange}
+            ></textarea>
+          </motion.div>
+        </div>
+      </div>
 
       <AnimatePresence>
         {files.length > 0 && (
@@ -151,10 +211,10 @@ const FileUpload = ({ onNext, onBack, initialFiles }: {
         <motion.button
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.98 }}
-          onClick={() => onNext(files)}
-          disabled={files.length === 0}
+          onClick={handleSubmit}
+          disabled={!hasContent}
           className={`px-6 py-3 rounded-md flex items-center gap-2 ${
-            files.length === 0 
+            !hasContent 
               ? "bg-gray-200 text-gray-500 cursor-not-allowed" 
               : "bg-amber-500 hover:bg-amber-600 text-white shadow-md hover:shadow-lg"
           } transition-all`}
