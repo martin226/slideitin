@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { FileIcon as FilePresentation, ChevronRight } from "lucide-react"
+import { FileIcon as FilePresentation, ChevronRight, ChevronDown } from "lucide-react"
 import FloatingDocument from "./floating-document"
 import Logo from "./logo"
 import { useEffect, useRef } from "react"
@@ -39,6 +39,14 @@ export function HeroSection({ onUploadClick }: HeroSectionProps) {
       document.body.removeChild(script);
     };
   }, []);
+
+  // Scroll down function for the chevron button
+  const scrollToNextSection = () => {
+    window.scrollTo({
+      top: window.innerHeight,
+      behavior: 'smooth'
+    });
+  };
 
   return (
     <div className="h-full w-full flex items-center justify-center">
@@ -152,6 +160,30 @@ export function HeroSection({ onUploadClick }: HeroSectionProps) {
           </motion.div>
         </div>
       </div>
+
+      {/* Down chevron at the bottom */}
+      <motion.div
+        className="absolute bottom-8 left-0 right-0 mx-auto w-10 flex justify-center cursor-pointer"
+        onClick={scrollToNextSection}
+        initial={{ opacity: 0 }}
+        animate={{ 
+          opacity: 1,
+          y: [0, 10, 0],
+        }}
+        transition={{
+          delay: 2,
+          y: {
+            repeat: Infinity,
+            duration: 2,
+            ease: "easeInOut",
+          }
+        }}
+        whileHover={{ scale: 1.1 }}
+      >
+        <div className="w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center">
+          <ChevronDown className="w-6 h-6 text-amber-500" />
+        </div>
+      </motion.div>
     </div>
   )
 }

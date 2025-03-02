@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import HeroSection from "@/components/hero-section"
+import UseCases from "@/components/use-cases"
 import Footer from "@/components/footer"
 import NotebookLine from "@/components/notebook-line"
 
@@ -19,16 +20,24 @@ export default function Page() {
   ))
 
   return (
-    <div className="h-screen w-full bg-amber-50 flex flex-col overflow-hidden">
-      {/* Notebook background only for hero section */}
-      <div className="absolute inset-0 flex flex-col justify-around py-8 overflow-hidden z-0">
-        {notebookLines}
+    <div className="min-h-screen w-full bg-amber-50 flex flex-col overflow-x-hidden">
+      {/* Hero section with full screen height */}
+      <div className="h-screen w-full relative">
+        {/* Notebook background only for hero section */}
+        <div className="absolute inset-0 flex flex-col justify-around py-8 overflow-hidden z-0">
+          {notebookLines}
+        </div>
+        <div className="absolute hidden sm:block left-16 md:left-24 top-0 bottom-0 w-0.5 bg-rose-400/30 z-0" />
+        
+        {/* Hero content */}
+        <div className="h-full z-10 relative">
+          <HeroSection onUploadClick={handleUploadClick} />
+        </div>
       </div>
-      <div className="absolute hidden sm:block left-16 md:left-24 top-0 bottom-0 w-0.5 bg-rose-400/30 z-0" />
       
-      {/* Hero content */}
-      <div className="flex-1 z-10 relative overflow-hidden">
-        <HeroSection onUploadClick={handleUploadClick} />
+      {/* Use Cases Section */}
+      <div className="w-full">
+        <UseCases />
       </div>
       
       {/* Footer */}
