@@ -13,6 +13,15 @@ import Uncover from "@/app/img/uncover.png"
 import GraphPaper from "@/app/img/graph_paper.png"
 import RosePine from "@/app/img/rose_pine.png"
 
+const themes = [
+  { id: "default", name: "Default", color: "bg-gray-50", image: Default },
+  { id: "beam", name: "Beam", color: "bg-blue-50", image: Beam },
+  { id: "rose_pine", name: "Rose Pine", color: "bg-purple-50", image: RosePine },
+  { id: "gaia", name: "Gaia", color: "bg-amber-50/70", image: Gaia},
+  { id: "uncover", name: "Uncover", color: "bg-green-50", image: Uncover },
+  { id: "graph_paper", name: "Graph Paper", color: "bg-orange-50", image: GraphPaper },
+]
+
 // Theme Selection Component
 const ThemeSelection = ({ onNext, onBack, initialTheme }: { 
   onNext: (theme: string) => void; 
@@ -20,14 +29,6 @@ const ThemeSelection = ({ onNext, onBack, initialTheme }: {
   initialTheme: string;
 }) => {
   const [selectedTheme, setSelectedTheme] = useState(initialTheme)
-  const themes = [
-    { id: "default", name: "Default", color: "bg-gray-50", image: Default },
-    { id: "beam", name: "Beam", color: "bg-blue-50", image: Beam },
-    { id: "rose_pine", name: "Rose Pine", color: "bg-purple-50", image: RosePine },
-    { id: "gaia", name: "Gaia", color: "bg-amber-50/70", image: Gaia},
-    { id: "uncover", name: "Uncover", color: "bg-green-50", image: Uncover },
-    { id: "graph_paper", name: "Graph Paper", color: "bg-orange-50", image: GraphPaper },
-  ]
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -55,6 +56,7 @@ const ThemeSelection = ({ onNext, onBack, initialTheme }: {
             <div className={`h-32 ${theme.color} rounded-md mb-4 flex items-center justify-center relative`}>
               {theme.image ? (
                 <Image 
+                  priority={true}
                   src={theme.image.src} 
                   alt={`${theme.name} theme preview`} 
                   className="object-cover rounded-md"
