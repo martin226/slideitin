@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Lightbulb, Clock, FileText, Brain, Zap, Users } from "lucide-react";
+import { Clock, FileText, Brain, Zap, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -63,7 +63,7 @@ export default function UseCases() {
           </h2>
           <p className="text-lg text-gray-600">
             Slide it In helps you create professional slides in minutes, not hours.
-            Here's how people are using it:
+            Here&apos;s how people are using it:
           </p>
         </motion.div>
 
@@ -129,7 +129,7 @@ export default function UseCases() {
             className="px-8 py-6 bg-amber-500 hover:bg-amber-600 text-white rounded-full text-lg font-medium"
             onClick={() => window.location.href = '/start'}
           >
-            Make a Presentation! (It's free)
+            Make a Presentation! (It&apos;s free)
           </Button>
           <p className="mt-4 text-gray-600 text-sm">No sign-up required. Start creating in seconds.</p>
         </motion.div>
