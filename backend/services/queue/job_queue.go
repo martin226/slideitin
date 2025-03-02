@@ -21,6 +21,9 @@ const (
 	StatusProcessing JobStatus = "processing"
 	StatusCompleted  JobStatus = "completed"
 	StatusFailed     JobStatus = "failed"
+	
+	// Maximum number of concurrent jobs to process
+	MaxConcurrentJobs = 5
 )
 
 // FirestoreJob is the Firestore representation of a job
@@ -81,6 +84,13 @@ type Service struct {
 			Type     string
 		}, settings models.SlideSettings, statusUpdateFn func(message string) error) ([]byte, []byte, error)
 	}
+	
+	// Job queue and worker pool management
+	jobQueue   chan *Job      // Channel for queued jobs
+	workerSem  chan struct{}  // Semaphore to limit concurrent workers
+	workerWg   sync.WaitGroup // WaitGroup to track active workers
+	isRunning  bool           // Flag to indicate if the worker pool is running
+	workerMu   sync.Mutex     // Mutex to protect isRunning
 }
 
 // NewService creates a new queue service using Firestore
@@ -93,10 +103,65 @@ func NewService(client *firestore.Client, slideSvc interface {
 }) *Service {
 	s := &Service{
 		client:    client,
-		slideSvc: slideSvc,
+		slideSvc:  slideSvc,
+		jobQueue:  make(chan *Job, 100),   // Buffer for up to 100 queued jobs
+		workerSem: make(chan struct{}, MaxConcurrentJobs), // Semaphore limiting to 5 concurrent jobs
+		isRunning: true,
 	}
-
+	
+	// Start the worker pool
+	go s.startWorkerPool()
+	
 	return s
+}
+
+// startWorkerPool starts a pool of workers to process jobs from the queue
+func (s *Service) startWorkerPool() {
+	log.Printf("Starting job worker pool with max %d concurrent jobs", MaxConcurrentJobs)
+	
+	for job := range s.jobQueue {
+		// Check if the service is still running
+		s.workerMu.Lock()
+		if !s.isRunning {
+			s.workerMu.Unlock()
+			return
+		}
+		s.workerMu.Unlock()
+		
+		// Acquire a semaphore slot (blocks when MaxConcurrentJobs are running)
+		s.workerSem <- struct{}{}
+		
+		// Track the worker with WaitGroup
+		s.workerWg.Add(1)
+		
+		// Start a worker goroutine
+		go func(job *Job) {
+			defer func() {
+				// Release the semaphore slot when done
+				<-s.workerSem
+				s.workerWg.Done()
+			}()
+			
+			// Process the job
+			s.processJob(job)
+		}(job)
+	}
+}
+
+// StopWorkerPool stops the worker pool and waits for all jobs to complete
+func (s *Service) StopWorkerPool() {
+	log.Println("Stopping job worker pool...")
+	
+	// Mark the service as not running
+	s.workerMu.Lock()
+	s.isRunning = false
+	close(s.jobQueue)
+	s.workerMu.Unlock()
+	
+	// Wait for all current jobs to complete
+	s.workerWg.Wait()
+	
+	log.Println("Job worker pool stopped")
 }
 
 // Collection returns the Firestore collection reference for jobs
@@ -109,7 +174,7 @@ func (s *Service) ResultsCollection() *firestore.CollectionRef {
 	return s.client.Collection("results")
 }
 
-// AddJob adds a new job to Firestore and processes it immediately
+// AddJob adds a new job to Firestore and queues it for processing
 func (s *Service) AddJob(ctx context.Context, id, theme string, fileData []struct {
 	Filename string
 	Data     []byte
@@ -148,8 +213,26 @@ func (s *Service) AddJob(ctx context.Context, id, theme string, fileData []struc
 		UpdatedAt: now,
 	}
 
-	// Start processing in a goroutine
-	go s.processJob(job)
+	// Check if worker pool is running
+	s.workerMu.Lock()
+	isRunning := s.isRunning
+	s.workerMu.Unlock()
+	
+	if !isRunning {
+		log.Printf("Worker pool is not running, job %s will not be processed", id)
+		return job, nil
+	}
+	
+	// Add job to the queue instead of starting a goroutine directly
+	select {
+	case s.jobQueue <- job:
+		log.Printf("Job %s added to processing queue", id)
+	default:
+		// Queue is full, update job status
+		s.updateJobStatus(job, StatusFailed, "Job queue is full, try again later", "")
+		log.Printf("Failed to queue job %s: queue is full", id)
+		return job, fmt.Errorf("job queue is full, try again later")
+	}
 
 	return job, nil
 }
