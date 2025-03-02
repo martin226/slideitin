@@ -4,7 +4,7 @@ export default function Footer() {
   const currentYear = new Date().getFullYear()
 
   return (
-    <footer className="pb-4 px-4 text-center text-xs sm:text-sm bg-amber-50/80 backdrop-blur-sm text-gray-600 border-t border-amber-100/50 w-full">
+    <footer className="pb-4 px-4 text-center text-xs sm:text-sm bg-amber-50 backdrop-blur-sm text-gray-600 w-full">
       <p>
         No data is permanently stored on our servers.
         Read our <Link href="/privacy" className="underline hover:text-amber-600 font-medium transition-colors">Privacy Policy</Link>.

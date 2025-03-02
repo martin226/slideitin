@@ -35,7 +35,9 @@ export function FloatingDocument({
       }}
       className={cn(
         "absolute shadow-lg rounded-md bg-white border border-gray-200 p-3 flex flex-col gap-2",
-        isPresentation ? "w-48 h-36 md:w-56 md:h-48" : "w-40 h-56 md:w-48 md:h-64",
+        isPresentation 
+          ? "w-32 h-24 xs:w-36 xs:h-28 sm:w-40 sm:h-32 md:w-48 md:h-36 lg:w-56 lg:h-48" 
+          : "w-28 h-40 xs:w-32 xs:h-44 sm:w-36 sm:h-48 md:w-40 md:h-56 lg:w-48 lg:h-64",
         className,
       )}
     >

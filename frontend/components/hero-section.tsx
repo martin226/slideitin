@@ -55,27 +55,27 @@ export function HeroSection({ onUploadClick }: HeroSectionProps) {
         <FloatingDocument 
           delay={0.3} 
           rotate={-5} 
-          className="hidden sm:block left-[5%] top-[15%]" 
+          className="hidden sm:block left-[5%] top-[10%] lg:top-[15%]" 
         />
 
         <FloatingDocument 
           delay={0.5} 
           rotate={5} 
           isPresentation={true} 
-          className="hidden sm:block right-[8%] top-[20%]" 
+          className="hidden sm:block right-[8%] top-[15%] lg:top-[20%]" 
         />
 
         <FloatingDocument 
           delay={0.7} 
           rotate={-8} 
-          className="hidden sm:block left-[12%] bottom-[15%]" 
+          className="hidden sm:block left-[12%] bottom-[10%] lg:bottom-[15%]" 
         />
 
         <FloatingDocument 
           delay={0.9} 
           rotate={7} 
           isPresentation={true} 
-          className="hidden sm:block right-[10%] bottom-[20%]" 
+          className="hidden sm:block right-[10%] bottom-[15%] lg:bottom-[20%]" 
         />
       </div>
 

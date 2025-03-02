@@ -47,7 +47,7 @@ export default function UseCases() {
   };
 
   return (
-    <section className="w-full py-20 bg-gradient-to-b from-amber-50 to-white">
+    <section className="w-full py-20 bg-amber-50">
       <div className="container mx-auto px-4 md:px-6">
         {/* Section Header */}
         <motion.div 
