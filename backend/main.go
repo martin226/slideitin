@@ -10,9 +10,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/slideitin/backend/controllers"
-	"github.com/slideitin/backend/services/slides"
-	"github.com/slideitin/backend/services/queue"
+	"github.com/martin226/slideitin/backend/controllers"
+	"github.com/martin226/slideitin/backend/services/queue"
 )
 
 func main() {
@@ -41,13 +40,6 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// Get API keys and project configuration from environment variables
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		log.Println("Warning: GEMINI_API_KEY not set, using placeholder")
-		apiKey = "sk-placeholder"
-	}
-
 	// Initialize Firestore client
 	ctx := context.Background()
 	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
@@ -63,14 +55,14 @@ func main() {
 	}
 	defer firestoreClient.Close()
 
-	// Initialize services
-	slideService := slides.NewSlideService(apiKey)
-	
-	// Initialize queue service with Firestore and Gemini service
-	queueService := queue.NewService(firestoreClient, slideService)
+	// Initialize queue service with Firestore
+	queueService, err := queue.NewService(firestoreClient)
+	if err != nil {
+		log.Fatalf("Failed to initialize queue service: %v", err)
+	}
 
 	// Initialize controllers
-	slideController := controllers.NewSlideController(slideService, queueService)
+	slideController := controllers.NewSlideController(queueService)
 
 	// API routes
 	v1 := router.Group("/v1")

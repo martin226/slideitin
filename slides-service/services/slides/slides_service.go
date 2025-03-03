@@ -13,8 +13,8 @@ import (
 	
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
-	"github.com/slideitin/backend/models"
-	"github.com/slideitin/backend/services/prompts"
+	"github.com/martin226/slideitin/slides-service/models"
+	"github.com/martin226/slideitin/slides-service/services/prompts"
 	"bytes"
 )
 
@@ -43,11 +43,7 @@ func NewSlideService(apiKey string) *SlideService {
 func (s *SlideService) GenerateSlides(
 	ctx context.Context, 
 	theme string, 
-	files []struct {
-		Filename string
-		Data     []byte
-		Type     string
-	},
+	files []models.File,
 	settings models.SlideSettings,
 	statusUpdateFn func(message string) error,
 ) ([]byte, []byte, error) {

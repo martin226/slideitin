@@ -1,9 +1,5 @@
 package models
 
-import (
-	"mime/multipart"
-)
-
 // Enum values for slide settings
 var (
 	// Valid themes
@@ -22,16 +18,17 @@ type SlideSettings struct {
 	Audience    string `json:"audience"`    // Values: general, academic, technical, professional, executive
 }
 
+type File struct {
+	Filename string `json:"filename"`
+	Data []byte `json:"data"`
+	Type string `json:"type"`
+}
+
 // SlideRequest represents the incoming request for slide generation
 type SlideRequest struct {
 	Theme    string       `json:"theme" binding:"required"`
 	Settings SlideSettings `json:"settings" binding:"required"`
 	// Files will be handled separately through multipart form
-}
-
-// FileUpload is a wrapper around the multipart.FileHeader for easier handling
-type FileUpload struct {
-	Files []*multipart.FileHeader `form:"files"`
 }
 
 // SlideResponse represents the response for a slide generation request

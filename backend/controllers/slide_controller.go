@@ -14,21 +14,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/slideitin/backend/models"
-	"github.com/slideitin/backend/services/slides"
-	"github.com/slideitin/backend/services/queue"
+	"github.com/martin226/slideitin/backend/models"
+	"github.com/martin226/slideitin/backend/services/queue"
 )
 
 // SlideController handles the slide generation API endpoints
 type SlideController struct {
-	slideService  *slides.SlideService
 	queueService  *queue.Service
 }
 
 // NewSlideController creates a new slide controller
-func NewSlideController(slideService *slides.SlideService, queueService *queue.Service) *SlideController {
+func NewSlideController(queueService *queue.Service) *SlideController {
 	return &SlideController{
-		slideService: slideService,
 		queueService:  queueService,
 	}
 }
@@ -129,11 +126,7 @@ func (c *SlideController) GenerateSlides(ctx *gin.Context) {
 	}
 
 	// Read file data into memory to prevent it from being released
-	fileData := make([]struct {
-		Filename string
-		Data     []byte
-		Type     string
-	}, 0, len(files))
+	fileData := make([]models.File, 0, len(files))
 	
 	for _, file := range files {
 		// Open the file
@@ -195,11 +188,7 @@ func (c *SlideController) GenerateSlides(ctx *gin.Context) {
 		}
 		
 		// Store the file data
-		fileData = append(fileData, struct {
-			Filename string
-			Data     []byte
-			Type     string
-		}{
+		fileData = append(fileData, models.File{
 			Filename: file.Filename,
 			Data:     data,
 			Type:     mimeType,

@@ -2,15 +2,19 @@ package queue
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"cloud.google.com/go/firestore"
-	"github.com/slideitin/backend/models"
+	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
+	taskspb "cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
+	"github.com/martin226/slideitin/backend/models"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"os"
 )
 
 // JobStatus represents the current status of a job
@@ -21,9 +25,6 @@ const (
 	StatusProcessing JobStatus = "processing"
 	StatusCompleted  JobStatus = "completed"
 	StatusFailed     JobStatus = "failed"
-	
-	// Maximum number of concurrent jobs to process
-	MaxConcurrentJobs = 5
 )
 
 // FirestoreJob is the Firestore representation of a job
@@ -51,11 +52,7 @@ type FirestoreResult struct {
 type Job struct {
 	ID        string
 	Theme     string
-	Files     []struct {
-		Filename string
-		Data     []byte
-		Type     string
-	}
+	Files     []models.File
 	Settings  models.SlideSettings
 	Status    JobStatus
 	Message   string
@@ -73,95 +70,62 @@ type JobUpdate struct {
 	UpdatedAt int64     `json:"updatedAt"`
 }
 
-// Service manages jobs using Firestore
+// TaskPayload represents the data structure to be sent in a Cloud Task
+type TaskPayload struct {
+	JobID     string            `json:"jobID"`
+	Theme     string            `json:"theme"`
+	Files     []models.File `json:"files"`
+	Settings  models.SlideSettings `json:"settings"`
+}
+
+// Service manages jobs using Firestore and Cloud Tasks
 type Service struct {
-	client    *firestore.Client
-	mu        sync.RWMutex
-	slideSvc interface {
-		GenerateSlides(ctx context.Context, theme string, files []struct {
-			Filename string
-			Data     []byte
-			Type     string
-		}, settings models.SlideSettings, statusUpdateFn func(message string) error) ([]byte, []byte, error)
-	}
-	
-	// Job queue and worker pool management
-	jobQueue   chan *Job      // Channel for queued jobs
-	workerSem  chan struct{}  // Semaphore to limit concurrent workers
-	workerWg   sync.WaitGroup // WaitGroup to track active workers
-	isRunning  bool           // Flag to indicate if the worker pool is running
-	workerMu   sync.Mutex     // Mutex to protect isRunning
+	client     *firestore.Client
+	taskClient *cloudtasks.Client
+	projectID  string
+	region     string
+	queueID    string
+	serviceURL string
 }
 
-// NewService creates a new queue service using Firestore
-func NewService(client *firestore.Client, slideSvc interface {
-	GenerateSlides(ctx context.Context, theme string, files []struct {
-		Filename string
-		Data     []byte
-		Type     string
-	}, settings models.SlideSettings, statusUpdateFn func(message string) error) ([]byte, []byte, error)
-}) *Service {
-	s := &Service{
-		client:    client,
-		slideSvc:  slideSvc,
-		jobQueue:  make(chan *Job, 100),   // Buffer for up to 100 queued jobs
-		workerSem: make(chan struct{}, MaxConcurrentJobs), // Semaphore limiting to 5 concurrent jobs
-		isRunning: true,
+// NewService creates a new queue service using Firestore and Cloud Tasks
+func NewService(client *firestore.Client) (*Service, error) {
+	// Get environment variables
+	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
+	if projectID == "" {
+		return nil, fmt.Errorf("GOOGLE_CLOUD_PROJECT environment variable is required")
 	}
 	
-	// Start the worker pool
-	go s.startWorkerPool()
-	
-	return s
-}
-
-// startWorkerPool starts a pool of workers to process jobs from the queue
-func (s *Service) startWorkerPool() {
-	log.Printf("Starting job worker pool with max %d concurrent jobs", MaxConcurrentJobs)
-	
-	for job := range s.jobQueue {
-		// Check if the service is still running
-		s.workerMu.Lock()
-		if !s.isRunning {
-			s.workerMu.Unlock()
-			return
-		}
-		s.workerMu.Unlock()
-		
-		// Acquire a semaphore slot (blocks when MaxConcurrentJobs are running)
-		s.workerSem <- struct{}{}
-		
-		// Track the worker with WaitGroup
-		s.workerWg.Add(1)
-		
-		// Start a worker goroutine
-		go func(job *Job) {
-			defer func() {
-				// Release the semaphore slot when done
-				<-s.workerSem
-				s.workerWg.Done()
-			}()
-			
-			// Process the job
-			s.processJob(job)
-		}(job)
+	region := os.Getenv("CLOUD_TASKS_REGION")
+	if region == "" {
+		region = "us-central1" // Default region
 	}
-}
-
-// StopWorkerPool stops the worker pool and waits for all jobs to complete
-func (s *Service) StopWorkerPool() {
-	log.Println("Stopping job worker pool...")
 	
-	// Mark the service as not running
-	s.workerMu.Lock()
-	s.isRunning = false
-	close(s.jobQueue)
-	s.workerMu.Unlock()
+	queueID := os.Getenv("CLOUD_TASKS_QUEUE_ID")
+	if queueID == "" {
+		queueID = "slides-generation-queue" // Default queue ID
+	}
 	
-	// Wait for all current jobs to complete
-	s.workerWg.Wait()
+	serviceURL := os.Getenv("SLIDES_SERVICE_URL")
+	if serviceURL == "" {
+		return nil, fmt.Errorf("SLIDES_SERVICE_URL environment variable is required")
+	}
 	
-	log.Println("Job worker pool stopped")
+	// Create Cloud Tasks client
+	ctx := context.Background()
+	taskClient, err := cloudtasks.NewClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Cloud Tasks client: %v", err)
+	}
+	
+	return &Service{
+		client:     client,
+		taskClient: taskClient,
+		projectID:  projectID,
+		region:     region,
+		queueID:    queueID,
+		serviceURL: serviceURL,
+	}, nil
 }
 
 // Collection returns the Firestore collection reference for jobs
@@ -174,12 +138,8 @@ func (s *Service) ResultsCollection() *firestore.CollectionRef {
 	return s.client.Collection("results")
 }
 
-// AddJob adds a new job to Firestore and queues it for processing
-func (s *Service) AddJob(ctx context.Context, id, theme string, fileData []struct {
-	Filename string
-	Data     []byte
-	Type     string
-}, settings models.SlideSettings) (*Job, error) {
+// AddJob adds a new job to Firestore and creates a Cloud Task for processing
+func (s *Service) AddJob(ctx context.Context, id, theme string, fileData []models.File, settings models.SlideSettings) (*Job, error) {
 	// Create the job
 	now := time.Now().Unix()
 	
@@ -201,7 +161,7 @@ func (s *Service) AddJob(ctx context.Context, id, theme string, fileData []struc
 
 	log.Printf("Added job %s to Firestore", id)
 
-	// Create in-memory job object for processing
+	// Create in-memory job object
 	job := &Job{
 		ID:        id,
 		Theme:     theme,
@@ -213,28 +173,70 @@ func (s *Service) AddJob(ctx context.Context, id, theme string, fileData []struc
 		UpdatedAt: now,
 	}
 
-	// Check if worker pool is running
-	s.workerMu.Lock()
-	isRunning := s.isRunning
-	s.workerMu.Unlock()
-	
-	if !isRunning {
-		log.Printf("Worker pool is not running, job %s will not be processed", id)
-		return job, nil
-	}
-	
-	// Add job to the queue instead of starting a goroutine directly
-	select {
-	case s.jobQueue <- job:
-		log.Printf("Job %s added to processing queue", id)
-	default:
-		// Queue is full, update job status
-		s.updateJobStatus(job, StatusFailed, "Job queue is full, try again later", "")
-		log.Printf("Failed to queue job %s: queue is full", id)
-		return job, fmt.Errorf("job queue is full, try again later")
+	// Create a Cloud Task to process the job
+	err = s.createTask(ctx, job)
+	if err != nil {
+		// Update job status to failed if task creation fails
+		s.updateJobStatus(job, StatusFailed, fmt.Sprintf("Failed to queue job: %v", err), "")
+		return job, fmt.Errorf("failed to create Cloud Task: %v", err)
 	}
 
 	return job, nil
+}
+
+// createTask creates a Cloud Task to process a job
+func (s *Service) createTask(ctx context.Context, job *Job) error {
+	taskPayload := TaskPayload{
+		JobID: job.ID,
+		Theme: job.Theme,
+		Files: job.Files,
+		Settings: job.Settings,
+	}
+	
+	payloadBytes, err := json.Marshal(taskPayload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal task payload: %v", err)
+	}
+	
+	// Define the Cloud Tasks queue path
+	queuePath := fmt.Sprintf("projects/%s/locations/%s/queues/%s", s.projectID, s.region, s.queueID)
+	
+	// Define the target endpoint
+	taskURL := fmt.Sprintf("%s/tasks/process-slides", s.serviceURL)
+
+	// Create the Cloud Task with OIDC token
+	task := &taskspb.CreateTaskRequest{
+		Parent: queuePath,
+		Task: &taskspb.Task{
+			// Name is assigned by the server
+			MessageType: &taskspb.Task_HttpRequest{
+				HttpRequest: &taskspb.HttpRequest{
+					HttpMethod: taskspb.HttpMethod_POST,
+					Url:        taskURL,
+					Headers: map[string]string{
+						"Content-Type": "application/json",
+					},
+					Body: payloadBytes,
+					AuthorizationHeader: &taskspb.HttpRequest_OidcToken{
+						OidcToken: &taskspb.OidcToken{
+							ServiceAccountEmail: fmt.Sprintf("%s@%s.iam.gserviceaccount.com", "slides-service-invoker", s.projectID),
+							Audience:            taskURL,
+						},
+					},
+				},
+			},
+			ScheduleTime: timestamppb.New(time.Now()),
+		},
+	}
+	
+	// Create the task
+	_, err = s.taskClient.CreateTask(ctx, task)
+	if err != nil {
+		return fmt.Errorf("failed to create task: %v", err)
+	}
+	
+	log.Printf("Created Cloud Task for job %s", job.ID)
+	return nil
 }
 
 // GetJob retrieves a job by its ID from Firestore
@@ -374,97 +376,6 @@ func (s *Service) WatchJob(ctx context.Context, jobID string, updates chan<- Job
 		}
 	}
 }
-
-// processJob processes a slide generation job
-func (s *Service) processJob(job *Job) {
-	// Update job status to processing in Firestore
-	s.updateJobStatus(job, StatusProcessing, "Processing slides", "")
-
-	// Create a status update function to pass to the Gemini service
-	statusUpdateFn := func(message string) error {
-		s.updateJobStatus(job, StatusProcessing, message, "")
-		return nil
-	}
-
-	// Call the Gemini service with the status update function
-	ctx := context.Background()
-	pdfData, htmlData, err := s.slideSvc.GenerateSlides(
-		ctx, 
-		job.Theme, 
-		job.Files, 
-		job.Settings,
-		statusUpdateFn,
-	)
-
-	if err != nil {
-		s.updateJobStatus(job, StatusFailed, "Failed to generate slides: "+err.Error(), "")
-		return
-	}
-
-	// Create result URL
-	resultURL := "/results/" + job.ID
-
-	// Store result in Firestore
-	s.storeResult(ctx, job.ID, resultURL, pdfData, htmlData)
-
-	// Update job as completed and set to expire in 5 minutes
-	s.setJobCompleted(job, "Slides generated successfully", resultURL)
-}
-
-// setJobCompleted marks a job as completed and sets it to expire in 5 minutes
-func (s *Service) setJobCompleted(job *Job, message, resultURL string) {
-	ctx := context.Background()
-	now := time.Now().Unix()
-	// Set job to expire in 5 minutes
-	expiresAt := now + 300 // 300 seconds = 5 minutes
-	
-	// Update job in Firestore
-	updates := []firestore.Update{
-		{Path: "status", Value: string(StatusCompleted)},
-		{Path: "message", Value: message},
-		{Path: "updatedAt", Value: now},
-		{Path: "expiresAt", Value: expiresAt},
-	}
-
-	_, err := s.Collection().Doc(job.ID).Update(ctx, updates)
-	if err != nil {
-		log.Printf("Failed to update job status in Firestore: %v", err)
-	}
-
-	// Update the in-memory job
-	job.Status = StatusCompleted
-	job.Message = message
-	job.UpdatedAt = now
-	job.ResultURL = resultURL
-
-	log.Printf("Job %s completed and will expire at %s", job.ID, time.Unix(expiresAt, 0).Format(time.RFC3339))
-}
-
-// storeResult stores a job result in Firestore
-func (s *Service) storeResult(ctx context.Context, jobID, resultURL string, pdfData []byte, htmlData []byte) error {
-	now := time.Now().Unix()
-	// Set expiration time to 1 hour from now
-	expiresAt := now + 3600
-	
-	result := FirestoreResult{
-		ID:          jobID,
-		ResultURL:   resultURL,
-		PDFData:     pdfData,
-		HTMLData:    htmlData,
-		CreatedAt:   now,
-		ExpiresAt:   expiresAt,
-	}
-	
-	_, err := s.ResultsCollection().Doc(jobID).Set(ctx, result)
-	if err != nil {
-		log.Printf("Failed to store result for job %s: %v", jobID, err)
-		return fmt.Errorf("failed to store result: %v", err)
-	}
-	
-	log.Printf("Stored result for job %s (expires at %s)", jobID, time.Unix(expiresAt, 0).Format(time.RFC3339))
-	return nil
-}
-
 // updateJobStatus updates a job's status in Firestore
 func (s *Service) updateJobStatus(job *Job, status JobStatus, message, resultURL string) {
 	ctx := context.Background()

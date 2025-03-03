@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"text/template"
 
-	"github.com/slideitin/backend/models"
+	"github.com/martin226/slideitin/slides-service/models"
 )
 
 // Templates for different prompt types
