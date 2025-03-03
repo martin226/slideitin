@@ -6,7 +6,7 @@ A powerful presentation generator that transforms documents into beautiful slide
 
 Try it now: https://justslideitin.com/
 
-Case study: https://martinsit.ca/writing/shipping-slide-generation-3-days
+Case study: https://martinsit.ca/writing/shipping-presentation-generation-3-days
 
 ## Overview
 
