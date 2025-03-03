@@ -1,5 +1,6 @@
 import '@/lib/promise-polyfill';
 import type { Metadata } from "next";
+import { GoogleAnalytics } from '@next/third-parties/google'
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -32,6 +33,7 @@ export default function RootLayout({
       >
         {children}
       </body>
+      <GoogleAnalytics gaId="G-0TDB0J43MC" />
     </html>
   );
 }
