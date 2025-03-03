@@ -63,22 +63,24 @@ slideitin/
 │   ├── lib/                # Utility functions and API client
 │   └── ...
 │
-├── backend/                # Go backend application
-│   ├── controllers/        # API controllers
-│   ├── models/             # Data models
-│   ├── services/           # Business logic
-│   │   ├── queue/          # Cloud Tasks queue management
-│   │   └── ...
-│   └── main.go             # Application entry point
-│
-└── slides-service/         # Go microservice for slide generation
-    ├── controllers/        # API controllers
-    ├── models/             # Data models
-    ├── services/           # Business logic
-        ├── prompts/        # AI prompt templates
-        ├── slides/         # Slide generation service
-        │   └── themes/     # Presentation theme files
-        └── ...
+├── backend/                # Go backend services
+│   ├── api/                # Main API application
+│   │   ├── controllers/    # API controllers
+│   │   ├── models/         # Data models
+│   │   ├── services/       # Business logic
+│   │   │   ├── queue/      # Cloud Tasks queue management
+│   │   │   └── ...
+│   │   └── main.go         # Application entry point
+│   │
+│   └── slides-service/     # Microservice for slide generation
+│       ├── controllers/    # API controllers
+│       ├── models/         # Data models
+│       ├── services/       # Business logic
+│       │   ├── prompts/    # AI prompt templates
+│       │   ├── slides/     # Slide generation service
+│       │   │   └── themes/ # Presentation theme files
+│       │   └── ...
+│       └── main.go         # Service entry point
 ```
 
 ## Getting Started

@@ -10,8 +10,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/martin226/slideitin/backend/controllers"
-	"github.com/martin226/slideitin/backend/services/queue"
+	"github.com/martin226/slideitin/backend/api/controllers"
+	"github.com/martin226/slideitin/backend/api/services/queue"
 )
 
 func main() {

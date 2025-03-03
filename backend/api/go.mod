@@ -1,4 +1,4 @@
-module github.com/martin226/slideitin/backend
+module github.com/martin226/slideitin/backend/api
 
 go 1.24.0
 

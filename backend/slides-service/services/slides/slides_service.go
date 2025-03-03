@@ -13,8 +13,8 @@ import (
 	
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
-	"github.com/martin226/slideitin/slides-service/models"
-	"github.com/martin226/slideitin/slides-service/services/prompts"
+	"github.com/martin226/slideitin/backend/slides-service/models"
+	"github.com/martin226/slideitin/backend/slides-service/services/prompts"
 	"bytes"
 )
 

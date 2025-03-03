@@ -14,8 +14,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/martin226/slideitin/backend/models"
-	"github.com/martin226/slideitin/backend/services/queue"
+	"github.com/martin226/slideitin/backend/api/models"
+	"github.com/martin226/slideitin/backend/api/services/queue"
 )
 
 // SlideController handles the slide generation API endpoints

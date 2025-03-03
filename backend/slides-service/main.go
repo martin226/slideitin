@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/martin226/slideitin/slides-service/controllers"
-	"github.com/martin226/slideitin/slides-service/services/slides"
+	"github.com/martin226/slideitin/backend/slides-service/controllers"
+	"github.com/martin226/slideitin/backend/slides-service/services/slides"
 	"cloud.google.com/go/firestore"
 )
 

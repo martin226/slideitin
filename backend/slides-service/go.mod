@@ -1,4 +1,4 @@
-module github.com/martin226/slideitin/slides-service
+module github.com/martin226/slideitin/backend/slides-service
 
 go 1.24.0
 

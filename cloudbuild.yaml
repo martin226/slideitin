@@ -2,7 +2,7 @@ steps:
   # Build the slides service image
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-slides-service'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/slideitin-slides-service', './slides-service/']
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/slideitin-slides-service', './backend/slides-service/']
 
   # Push the slides service image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
@@ -32,7 +32,7 @@ steps:
     # Build the backend image
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-backend'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/slideitin-backend', './backend/']
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/slideitin-backend', './backend/api/']
 
   # Push the backend image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'

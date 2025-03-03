@@ -10,7 +10,7 @@ import (
 	"cloud.google.com/go/firestore"
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	taskspb "cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
-	"github.com/martin226/slideitin/backend/models"
+	"github.com/martin226/slideitin/backend/api/models"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"

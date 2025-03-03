@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"cloud.google.com/go/firestore"
-	"github.com/martin226/slideitin/slides-service/services/slides"
-	"github.com/martin226/slideitin/slides-service/models"
+	"github.com/martin226/slideitin/backend/slides-service/services/slides"
+	"github.com/martin226/slideitin/backend/slides-service/models"
 )
 
 // TaskPayload represents the data structure received from Cloud Tasks
