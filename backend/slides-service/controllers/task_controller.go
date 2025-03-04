@@ -3,21 +3,31 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"cloud.google.com/go/firestore"
+	"cloud.google.com/go/storage"
 	"github.com/martin226/slideitin/backend/slides-service/services/slides"
 	"github.com/martin226/slideitin/backend/slides-service/models"
+	"os"
 )
+
+// FileReference represents a reference to a file stored in GCS
+type FileReference struct {
+	Filename string `json:"filename"`
+	Type     string `json:"type"`
+	GCSPath  string `json:"gcsPath"`
+}
 
 // TaskPayload represents the data structure received from Cloud Tasks
 type TaskPayload struct {
 	JobID     string            `json:"jobID"`
 	Theme     string            `json:"theme"`
-	Files     []models.File `json:"files"`
+	Files     []FileReference   `json:"files"`
 	Settings  models.SlideSettings `json:"settings"`
 }
 
@@ -45,18 +55,73 @@ type FirestoreResult struct {
 type TaskController struct {
 	slideService *slides.SlideService
 	firestoreClient *firestore.Client
+	storageClient *storage.Client
+	bucketName string
 }
 
 // NewTaskController creates a new task controller
 func NewTaskController(slideService *slides.SlideService, firestoreClient *firestore.Client) *TaskController {
+	// Get bucket name from environment variables
+	bucketName := os.Getenv("GCS_BUCKET_NAME")
+	if bucketName == "" {
+		bucketName = "slideitin-files" // Default bucket name
+	}
+	
+	// Create Cloud Storage client
+	ctx := context.Background()
+	storageClient, err := storage.NewClient(ctx)
+	if err != nil {
+		log.Printf("Failed to create Cloud Storage client: %v", err)
+		// Continue without storage client, will be handled in requests
+	}
+	
 	return &TaskController{
 		slideService: slideService,
 		firestoreClient: firestoreClient,
+		storageClient: storageClient,
+		bucketName: bucketName,
 	}
+}
+
+// downloadFileFromGCS downloads a file from Google Cloud Storage
+func (c *TaskController) downloadFileFromGCS(ctx context.Context, gcsPath string) ([]byte, string, error) {
+	// Get a handle to the bucket
+	bucket := c.storageClient.Bucket(c.bucketName)
+	
+	// Get a handle to the object
+	obj := bucket.Object(gcsPath)
+	
+	// Check if the object exists
+	attrs, err := obj.Attrs(ctx)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get object attributes: %v", err)
+	}
+	
+	// Create a reader for the object
+	r, err := obj.NewReader(ctx)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create reader: %v", err)
+	}
+	defer r.Close()
+	
+	// Read the file data
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read file: %v", err)
+	}
+	
+	return data, attrs.ContentType, nil
 }
 
 // ProcessSlides handles slide generation requests from Cloud Tasks
 func (c *TaskController) ProcessSlides(ctx *gin.Context) {
+	// Check if storage client is available
+	if c.storageClient == nil {
+		log.Printf("Storage client not available")
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Storage client not configured"})
+		return
+	}
+	
 	// Parse task payload from request body
 	var payload TaskPayload
 	if err := ctx.ShouldBindJSON(&payload); err != nil {
@@ -77,11 +142,32 @@ func (c *TaskController) ProcessSlides(ctx *gin.Context) {
 		return
 	}
 	
+	// Download files from GCS
+	files := make([]models.File, 0, len(payload.Files))
+	for _, fileRef := range payload.Files {
+		// Download the file from GCS
+		fileData, contentType, err := c.downloadFileFromGCS(ctx.Request.Context(), fileRef.GCSPath)
+		if err != nil {
+			log.Printf("Failed to download file %s: %v", fileRef.Filename, err)
+			c.updateJobStatus(payload.JobID, "failed", fmt.Sprintf("Failed to download file %s: %v", fileRef.Filename, err), "")
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to download file: %v", err)})
+			return
+		}
+		
+		// Create a file object
+		file := models.File{
+			Filename: fileRef.Filename,
+			Data:     fileData,
+			Type:     contentType,
+		}
+		files = append(files, file)
+	}
+	
 	// Generate slides
 	pdfData, htmlData, err := c.slideService.GenerateSlides(
 		ctx.Request.Context(),
 		payload.Theme,
-		payload.Files,
+		files,
 		payload.Settings,
 		statusUpdateFn,
 	)
@@ -102,6 +188,18 @@ func (c *TaskController) ProcessSlides(ctx *gin.Context) {
 		c.updateJobStatus(payload.JobID, "failed", fmt.Sprintf("Failed to store result: %v", err), "")
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to store result: %v", err)})
 		return
+	}
+	
+	// Clean up files from GCS
+	for _, fileRef := range payload.Files {
+		// Delete the file from GCS
+		obj := c.storageClient.Bucket(c.bucketName).Object(fileRef.GCSPath)
+		if err := obj.Delete(ctx.Request.Context()); err != nil {
+			log.Printf("Warning: Failed to delete file %s from GCS: %v", fileRef.GCSPath, err)
+			// Continue anyway, this is not a critical error
+		} else {
+			log.Printf("Deleted file %s from GCS", fileRef.GCSPath)
+		}
 	}
 	
 	// Mark job as completed

@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"time"
+	"bytes"
+	"path/filepath"
 
 	"cloud.google.com/go/firestore"
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	taskspb "cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
+	"cloud.google.com/go/storage"
 	"github.com/martin226/slideitin/backend/api/models"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -70,25 +74,34 @@ type JobUpdate struct {
 	UpdatedAt int64     `json:"updatedAt"`
 }
 
+// FileReference represents a reference to a file stored in GCS
+type FileReference struct {
+	Filename string `json:"filename"`
+	Type     string `json:"type"`
+	GCSPath  string `json:"gcsPath"`
+}
+
 // TaskPayload represents the data structure to be sent in a Cloud Task
 type TaskPayload struct {
 	JobID     string            `json:"jobID"`
 	Theme     string            `json:"theme"`
-	Files     []models.File `json:"files"`
+	Files     []FileReference   `json:"files"`
 	Settings  models.SlideSettings `json:"settings"`
 }
 
-// Service manages jobs using Firestore and Cloud Tasks
+// Service manages jobs using Firestore, Cloud Tasks, and Cloud Storage
 type Service struct {
 	client     *firestore.Client
 	taskClient *cloudtasks.Client
+	storageClient *storage.Client
 	projectID  string
 	region     string
 	queueID    string
 	serviceURL string
+	bucketName string
 }
 
-// NewService creates a new queue service using Firestore and Cloud Tasks
+// NewService creates a new queue service using Firestore, Cloud Tasks, and Cloud Storage
 func NewService(client *firestore.Client) (*Service, error) {
 	// Get environment variables
 	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
@@ -111,6 +124,11 @@ func NewService(client *firestore.Client) (*Service, error) {
 		return nil, fmt.Errorf("SLIDES_SERVICE_URL environment variable is required")
 	}
 	
+	bucketName := os.Getenv("GCS_BUCKET_NAME")
+	if bucketName == "" {
+		bucketName = "slideitin-files" // Default bucket name
+	}
+	
 	// Create Cloud Tasks client
 	ctx := context.Background()
 	taskClient, err := cloudtasks.NewClient(ctx)
@@ -118,13 +136,21 @@ func NewService(client *firestore.Client) (*Service, error) {
 		return nil, fmt.Errorf("failed to create Cloud Tasks client: %v", err)
 	}
 	
+	// Create Cloud Storage client
+	storageClient, err := storage.NewClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Cloud Storage client: %v", err)
+	}
+	
 	return &Service{
-		client:     client,
-		taskClient: taskClient,
-		projectID:  projectID,
-		region:     region,
-		queueID:    queueID,
-		serviceURL: serviceURL,
+		client:        client,
+		taskClient:    taskClient,
+		storageClient: storageClient,
+		projectID:     projectID,
+		region:        region,
+		queueID:       queueID,
+		serviceURL:    serviceURL,
+		bucketName:    bucketName,
 	}, nil
 }
 
@@ -138,7 +164,47 @@ func (s *Service) ResultsCollection() *firestore.CollectionRef {
 	return s.client.Collection("results")
 }
 
-// AddJob adds a new job to Firestore and creates a Cloud Task for processing
+// uploadFileToGCS uploads a file to Google Cloud Storage and returns its GCS path
+func (s *Service) uploadFileToGCS(ctx context.Context, jobID string, file models.File) (string, error) {
+	// Create a GCS object path: jobID/filename
+	objectPath := filepath.Join(jobID, file.Filename)
+	
+	// Get a handle to the bucket
+	bucket := s.storageClient.Bucket(s.bucketName)
+	
+	// Check if the bucket exists, if not create it
+	if _, err := bucket.Attrs(ctx); err != nil {
+		if err == storage.ErrBucketNotExist {
+			if err := bucket.Create(ctx, s.projectID, nil); err != nil {
+				return "", fmt.Errorf("failed to create bucket: %v", err)
+			}
+		} else {
+			return "", fmt.Errorf("failed to check bucket: %v", err)
+		}
+	}
+	
+	// Create a writer for the object
+	obj := bucket.Object(objectPath)
+	w := obj.NewWriter(ctx)
+	w.ContentType = file.Type
+	
+	// Write the file data to GCS
+	if _, err := io.Copy(w, bytes.NewReader(file.Data)); err != nil {
+		w.Close()
+		return "", fmt.Errorf("failed to write file to GCS: %v", err)
+	}
+	
+	// Close the writer
+	if err := w.Close(); err != nil {
+		return "", fmt.Errorf("failed to close GCS writer: %v", err)
+	}
+	
+	log.Printf("Uploaded file %s to GCS: gs://%s/%s", file.Filename, s.bucketName, objectPath)
+	
+	return objectPath, nil
+}
+
+// AddJob adds a new job to Firestore, uploads files to GCS, and creates a Cloud Task for processing
 func (s *Service) AddJob(ctx context.Context, id, theme string, fileData []models.File, settings models.SlideSettings) (*Job, error) {
 	// Create the job
 	now := time.Now().Unix()
@@ -173,8 +239,28 @@ func (s *Service) AddJob(ctx context.Context, id, theme string, fileData []model
 		UpdatedAt: now,
 	}
 
+	// Upload files to GCS
+	fileRefs := make([]FileReference, 0, len(fileData))
+	for _, file := range fileData {
+		// Upload the file to GCS
+		gcsPath, err := s.uploadFileToGCS(ctx, id, file)
+		if err != nil {
+			// Update job status to failed if file upload fails
+			s.updateJobStatus(job, StatusFailed, fmt.Sprintf("Failed to upload file %s: %v", file.Filename, err), "")
+			return job, fmt.Errorf("failed to upload file: %v", err)
+		}
+		
+		// Create a file reference
+		fileRef := FileReference{
+			Filename: file.Filename,
+			Type:     file.Type,
+			GCSPath:  gcsPath,
+		}
+		fileRefs = append(fileRefs, fileRef)
+	}
+
 	// Create a Cloud Task to process the job
-	err = s.createTask(ctx, job)
+	err = s.createTask(ctx, job, fileRefs)
 	if err != nil {
 		// Update job status to failed if task creation fails
 		s.updateJobStatus(job, StatusFailed, fmt.Sprintf("Failed to queue job: %v", err), "")
@@ -185,11 +271,11 @@ func (s *Service) AddJob(ctx context.Context, id, theme string, fileData []model
 }
 
 // createTask creates a Cloud Task to process a job
-func (s *Service) createTask(ctx context.Context, job *Job) error {
+func (s *Service) createTask(ctx context.Context, job *Job, fileRefs []FileReference) error {
 	taskPayload := TaskPayload{
 		JobID: job.ID,
 		Theme: job.Theme,
-		Files: job.Files,
+		Files: fileRefs,
 		Settings: job.Settings,
 	}
 	
@@ -235,7 +321,7 @@ func (s *Service) createTask(ctx context.Context, job *Job) error {
 		return fmt.Errorf("failed to create task: %v", err)
 	}
 	
-	log.Printf("Created Cloud Task for job %s", job.ID)
+	log.Printf("Created Cloud Task for job %s with %d file references", job.ID, len(fileRefs))
 	return nil
 }
 
